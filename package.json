@@ -1,0 +1,25 @@
+{
+  "name": "webrtc-p2p-transfer",
+  "version": "1.0.0",
+  "description": "WebRTC-based P2P file transfer tool with browser and CLI support",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "serve": "http-server client -p 8080 -c-1",
+    "dev:full": "concurrently \"npm run dev\" \"npm run serve\""
+  },
+  "keywords": ["webrtc", "p2p", "file-transfer", "peer-to-peer"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "http-server": "^14.1.1",
+    "concurrently": "^8.2.2"
+  }
+}

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P File Transfer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>P2P File Transfer</h1>
+            <div id="connection-status" class="status disconnected"></div>
+        </header>
+
+        <main>
+            <!-- 连接设置 -->
+            <section id="connection-section" class="section">
+                <h2>Connection Settings</h2>
+                <div class="form-group">
+                    <label for="server-url">Server:</label>
+                    <input type="text" id="server-url" placeholder="信令服务器地址 (自动检测)">
+                </div>
+                <div class="form-group">
+                    <label for="room-id">Room ID:</label>
+                    <input type="text" id="room-id" placeholder="Enter room ID">
+                    <button id="generate-room">Generate</button>
+                </div>
+                <button id="connect-btn">Connect</button>
+                <button id="disconnect-btn" style="display: none;">Disconnect</button>
+            </section>
+
+            <!-- 文件传输区域 -->
+            <section id="transfer-section" class="section" style="display: none;">
+                <h2>File Transfer</h2>
+                
+                <h3>Send Files</h3>
+                <div class="file-drop-zone" id="file-drop-zone">
+                    <div class="drop-content">
+                        <p>Drop files here or click to select</p>
+                        <input type="file" id="file-input" multiple style="display: none;">
+                        <button id="select-file-btn">Select Files</button>
+                    </div>
+                </div>
+
+                <h3>Transfer Progress</h3>
+                <div id="transfer-list" class="transfer-list">
+                    <!-- Transfer items will be added here -->
+                </div>
+
+                <h3>Received Files</h3>
+                <div id="received-files" class="received-files">
+                    <!-- Received files will be shown here -->
+                </div>
+            </section>
+
+            <!-- 日志区域 -->
+            <section id="log-section" class="section">
+                <h2>Connection Log</h2>
+                <div id="log-container" class="log-container">
+                    <!-- Log messages will appear here -->
+                </div>
+                <button id="clear-log">Clear Log</button>
+            </section>
+        </main>
+    </div>
+
+    <!-- 脚本 -->
+    <script src="webrtc-manager.js"></script>
+    <script src="file-transfer.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

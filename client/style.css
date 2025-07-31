@@ -1,0 +1,175 @@
+/* 朴素文本风格样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Courier New', monospace;
+    background-color: #ffffff;
+    color: #000000;
+    line-height: 1.4;
+    padding: 20px;
+    font-size: 14px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+h1 {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+h2 {
+    font-size: 14px;
+    font-weight: bold;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+h3 {
+    font-size: 14px;
+    font-weight: bold;
+    margin-top: 15px;
+    margin-bottom: 8px;
+}
+
+.section {
+    margin-bottom: 30px;
+}
+
+.form-group {
+    margin-bottom: 10px;
+}
+
+.form-group label {
+    display: inline-block;
+    width: 150px;
+    font-weight: normal;
+}
+
+.form-group input {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    padding: 2px 4px;
+    border: 1px solid #000000;
+    background-color: #ffffff;
+    color: #000000;
+    width: 220px;
+}
+
+button {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    padding: 4px 8px;
+    border: 1px solid #000000;
+    background-color: #ffffff;
+    color: #000000;
+    cursor: pointer;
+    margin-right: 8px;
+}
+
+button:hover {
+    background-color: #f0f0f0;
+}
+
+.status {
+    display: inline;
+    font-weight: bold;
+}
+
+.status.disconnected:before { content: "[断开] "; }
+.status.connecting:before { content: "[连接中] "; }
+.status.connected:before { content: "[已连接] "; }
+
+.file-drop-zone {
+    border: 1px solid #000000;
+    padding: 20px;
+    text-align: center;
+    margin: 10px 0;
+    background-color: #ffffff;
+}
+
+.file-drop-zone:hover {
+    background-color: #f8f8f8;
+}
+
+.transfer-item {
+    border: 1px solid #000000;
+    margin: 5px 0;
+    padding: 10px;
+    background-color: #ffffff;
+}
+
+.transfer-item h4 {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+/* ASCII 进度条样式 */
+.progress-bar {
+    font-family: 'Courier New', monospace;
+    margin: 5px 0;
+}
+
+.progress-text {
+    font-family: 'Courier New', monospace;
+}
+
+.file-item {
+    border: 1px solid #000000;
+    margin: 5px 0;
+    padding: 10px;
+    background-color: #ffffff;
+}
+
+.file-item h4 {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.log-container {
+    border: 1px solid #000000;
+    padding: 10px;
+    height: 200px;
+    overflow-y: auto;
+    background-color: #ffffff;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+}
+
+.log-entry {
+    margin-bottom: 2px;
+}
+
+.log-entry.error { font-weight: bold; }
+.log-entry.success { font-style: italic; }
+.log-entry.warning { text-decoration: underline; }
+
+/* 移除所有花哨效果 */
+.section {
+    border: none;
+    box-shadow: none;
+    background: none;
+}
+
+header {
+    border: none;
+    box-shadow: none;
+    background: none;
+    text-align: left;
+    padding: 0;
+    margin-bottom: 20px;
+}
+
+/* 隐藏不需要的装饰元素 */
+.drop-icon {
+    display: none;
+}
