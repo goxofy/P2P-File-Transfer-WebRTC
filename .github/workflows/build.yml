@@ -8,7 +8,20 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: node18-linux-x64
+            output: p2p-transfer-linux-x64
+          - runner: macos-latest
+            target: node18-macos-x64
+            output: p2p-transfer-macos-x64
+          - runner: windows-latest
+            target: node18-win-x64
+            output: p2p-transfer-windows-x64.exe
+    
+    runs-on: ${{ matrix.runner }}
     
     steps:
     - name: Checkout code
@@ -30,36 +43,52 @@ jobs:
     - name: Install pkg globally
       run: npm install -g pkg
       
-    - name: Build binaries
+    - name: Build binary
       run: |
         mkdir -p dist
-        pkg cli/index.js \
-          --targets node18-linux-x64,node18-macos-x64,node18-win-x64 \
-          --out-path dist \
-          --compress GZip
-          
-    - name: Rename binaries
+        pkg cli/index.js --targets ${{ matrix.target }} --out-path dist --compress GZip
+        
+    - name: Rename binary (Linux/macOS)
+      if: runner.os != 'Windows'
       run: |
         cd dist
-        mv index-linux p2p-transfer-linux-x64 || true
-        mv index-macos p2p-transfer-macos-x64 || true
-        mv index-win.exe p2p-transfer-windows-x64.exe || true
-        ls -la
+        if [ -f "index-linux" ]; then
+          mv index-linux ${{ matrix.output }}
+        elif [ -f "index-macos" ]; then
+          mv index-macos ${{ matrix.output }}
+        fi
+        
+    - name: Rename binary (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cd dist
+        if (Test-Path "index-win.exe") {
+          Move-Item "index-win.exe" "${{ matrix.output }}"
+        }
+      shell: powershell
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: p2p-transfer-binaries
-        path: dist/*
+        name: ${{ matrix.output }}
+        path: dist/${{ matrix.output }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: dist
         
     - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          dist/p2p-transfer-linux-x64
-          dist/p2p-transfer-macos-x64
-          dist/p2p-transfer-windows-x64.exe
+          dist/*/p2p-transfer-*
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
