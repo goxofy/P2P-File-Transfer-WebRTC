@@ -63,11 +63,18 @@ class FileTransferManager {
     
     // 发送文件块
     for (let i = 0; i < totalChunks; i++) {
+      // 检查传输是否已被停止
+      const transfer = this.activeTransfers.get(transferId);
+      if (!transfer) {
+        console.log('Transfer stopped, cancelling file send for:', transferId, 'at chunk:', i);
+        return null;
+      }
+      
       const start = i * this.chunkSize;
       const end = Math.min(start + this.chunkSize, arrayBuffer.byteLength);
       const chunk = arrayBuffer.slice(start, end);
       
-      this.sendMessage({
+      const success = this.sendMessage({
         type: 'file-chunk',
         transferId: transferId,
         chunkIndex: i,
@@ -75,8 +82,22 @@ class FileTransferManager {
         data: chunk
       });
       
+      // 如果发送失败，停止传输
+      if (!success) {
+        console.log('Failed to send chunk', i, ', stopping transfer:', transferId);
+        this.activeTransfers.delete(transferId);
+        if (this.onTransferError) {
+          this.onTransferError({
+            transferId: transferId,
+            fileName: fileInfo.name,
+            error: '传输中断：无法发送数据',
+            type: 'send'
+          });
+        }
+        return null;
+      }
+      
       // 更新进度
-      const transfer = this.activeTransfers.get(transferId);
       transfer.sentChunks = i + 1;
       
       if (this.onTransferProgress) {
@@ -96,14 +117,20 @@ class FileTransferManager {
       }
     }
     
+    // 检查传输是否已被停止（最终检查）
+    const finalTransfer = this.activeTransfers.get(transferId);
+    if (!finalTransfer) {
+      console.log('Transfer was stopped before completion, not sending file-complete message');
+      return null;
+    }
+    
     // 发送传输完成消息
     this.sendMessage({
       type: 'file-complete',
       transferId: transferId
     });
     
-    const transfer = this.activeTransfers.get(transferId);
-    const duration = Date.now() - transfer.startTime;
+    const duration = Date.now() - finalTransfer.startTime;
     
     if (this.onTransferComplete) {
       this.onTransferComplete({
@@ -150,6 +177,10 @@ class FileTransferManager {
       if (typeof data === 'string') {
         message = JSON.parse(data);
         this.handleParsedMessage(message);
+      } else if (typeof data === 'object' && data !== null) {
+        // 处理已经解析的对象（来自CLI通过WebSocket）
+        console.log('Received parsed object from CLI:', data);
+        this.handleParsedMessage(data);
       } else {
         console.warn('Unknown data type:', typeof data, data);
         return;
@@ -294,8 +325,6 @@ class FileTransferManager {
     receivingFile.chunks.set(chunkIndex, binaryData);
     receivingFile.receivedChunks++;
     
-    console.log('Stored chunk', chunkIndex, 'for transfer', transferId, 'progress:', receivingFile.receivedChunks, '/', totalChunks);
-    
     // 更新进度
     if (this.onTransferProgress) {
       this.onTransferProgress({
@@ -424,6 +453,43 @@ class FileTransferManager {
   
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  // 停止所有正在进行的传输
+  stopAllTransfers() {
+    console.log('Stopping all active transfers, current count:', this.activeTransfers.size);
+    
+    // 停止发送传输
+    this.activeTransfers.forEach((transfer, transferId) => {
+      console.log('Stopping send transfer:', transferId, transfer.file.name);
+      if (this.onTransferError) {
+        this.onTransferError({
+          transferId: transferId,
+          fileName: transfer.file.name,
+          error: '传输被中断',
+          type: 'send'
+        });
+      }
+    });
+    
+    // 停止接收传输
+    this.receivingFiles.forEach((transfer, transferId) => {
+      console.log('Stopping receive transfer:', transferId, transfer.info.name);
+      if (this.onTransferError) {
+        this.onTransferError({
+          transferId: transferId,
+          fileName: transfer.info.name,
+          error: '传输被中断',
+          type: 'receive'
+        });
+      }
+    });
+    
+    // 清空所有传输记录
+    this.activeTransfers.clear();
+    this.receivingFiles.clear();
+    
+    console.log('All transfers stopped, remaining counts - active:', this.activeTransfers.size, 'receiving:', this.receivingFiles.size);
   }
   
   // 获取传输统计

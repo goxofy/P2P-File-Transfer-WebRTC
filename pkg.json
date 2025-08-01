@@ -1,0 +1,21 @@
+{
+  "name": "p2p-transfer",
+  "version": "1.0.0",
+  "targets": [
+    "node18-linux-x64",
+    "node18-linux-x86",
+    "node18-linux-arm64", 
+    "node18-macos-x64",
+    "node18-macos-arm64",
+    "node18-win-x64",
+    "node18-win-x86"
+  ],
+  "outputPath": "dist",
+  "assets": [
+    "cli/**/*"
+  ],
+  "scripts": [
+    "cli/index.js",
+    "cli/p2p-transfer.js"
+  ]
+}

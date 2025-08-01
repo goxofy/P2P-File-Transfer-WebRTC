@@ -6,6 +6,7 @@ class WebRTCManager {
     this.clientId = this.generateId();
     this.roomId = null;
     this.isInitiator = false;
+    this.transferStopped = false; // 传输停止标志
     
     // ICE 服务器配置 (使用免费的 STUN 服务器)
     this.iceServers = [
@@ -36,6 +37,7 @@ class WebRTCManager {
   connectToSignalingServer(serverUrl = 'ws://localhost:3000') {
     return new Promise((resolve, reject) => {
       try {
+        this.transferStopped = false; // 重置传输停止标志
         this.ws = new WebSocket(serverUrl);
         
         // 设置连接超时
@@ -101,21 +103,42 @@ class WebRTCManager {
     
     switch (message.type) {
       case 'room-joined':
-        console.log('Joined room:', message.roomId, 'existing members:', message.existingMembers.length);
+        console.log('Joined room:', message.roomId, 'existing members:', message.existingMembers);
         if (message.existingMembers.length > 0) {
-          // 如果房间里已有其他成员，作为发起方建立连接
-          console.log('Setting as initiator (room has existing members)');
-          this.isInitiator = true;
-          await this.initializePeerConnection();
-          await this.createOffer();
+          // 检查是否有其他Web客户端
+          const webClients = message.existingMembers.filter(member => member.clientType === 'web');
+          const cliClients = message.existingMembers.filter(member => member.clientType === 'cli');
+          
+          console.log(`Found ${webClients.length} web clients and ${cliClients.length} CLI clients`);
+          
+          if (webClients.length > 0) {
+            // 如果房间里已有其他Web客户端，作为发起方建立WebRTC连接
+            console.log('Setting as WebRTC initiator (room has existing web clients)');
+            this.isInitiator = true;
+            await this.initializePeerConnection();
+            await this.createOffer();
+          } else if (cliClients.length > 0) {
+            // 只有CLI客户端，标记为连接状态但不建立WebRTC
+            console.log('Connected to CLI clients only, no WebRTC needed');
+            if (this.onConnectionStateChange) {
+              this.onConnectionStateChange('connected-cli');
+            }
+          }
         }
         break;
         
       case 'peer-joined':
-        console.log('Peer joined:', message.clientId, 'current isInitiator:', this.isInitiator);
-        if (!this.isInitiator && !this.peerConnection) {
-          // 作为接收方初始化连接
-          console.log('Initializing as receiver');
+        console.log('Peer joined:', message.clientId, 'type:', message.clientType, 'current isInitiator:', this.isInitiator);
+        
+        if (message.clientType === 'cli') {
+          // CLI客户端加入，不需要建立WebRTC连接，但需要通知应用
+          console.log('CLI client joined, no WebRTC connection needed');
+          if (this.onConnectionStateChange) {
+            this.onConnectionStateChange('connected-cli');
+          }
+        } else if (!this.isInitiator && !this.peerConnection) {
+          // Web客户端加入，作为接收方初始化WebRTC连接
+          console.log('Initializing WebRTC as receiver');
           await this.initializePeerConnection();
         }
         break;
@@ -137,7 +160,43 @@ class WebRTCManager {
         
       case 'peer-left':
         console.log('Peer left:', message.clientId);
+        // 不管是WebRTC还是CLI模式，都需要通知连接状态变化
+        if (this.onConnectionStateChange) {
+          this.onConnectionStateChange('disconnected');
+        }
         this.closePeerConnection();
+        break;
+        
+      case 'data':
+        console.log('Received data message from CLI');
+        if (this.onDataChannelMessage) {
+          this.onDataChannelMessage(message.data);
+        }
+        break;
+        
+      case 'transfer-error':
+        console.log('Received transfer error:', message.error);
+        this.transferStopped = true; // 设置传输停止标志
+        if (this.onError) {
+          this.onError({
+            type: '传输错误',
+            message: message.error
+          });
+        }
+        // 通知连接状态变化为断开
+        if (this.onConnectionStateChange) {
+          this.onConnectionStateChange('disconnected');
+        }
+        break;
+        
+      case 'room-full':
+        console.log('Room is full:', message.message);
+        if (this.onError) {
+          this.onError({
+            type: '房间已满',
+            message: message.message
+          });
+        }
         break;
     }
   }
@@ -266,20 +325,44 @@ class WebRTCManager {
   }
   
   // 发送数据通过 DataChannel
+  // 发送数据 (支持WebRTC和CLI模式)
   sendData(data) {
-    console.log('Attempting to send data via DataChannel, length:', data.length, 'readyState:', this.dataChannel?.readyState);
+    console.log('Attempting to send data, length:', data.length, 'DataChannel state:', this.dataChannel?.readyState, 'WebSocket state:', this.ws?.readyState);
     
+    // 如果有WebRTC连接，优先使用WebRTC
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
       try {
         this.dataChannel.send(data);
-        console.log('Data sent successfully');
+        console.log('Data sent via WebRTC DataChannel');
         return true;
       } catch (error) {
-        console.error('Error sending data:', error);
+        console.error('Error sending data via WebRTC:', error);
+        return false;
+      }
+    } 
+    // 否则通过WebSocket发送给CLI
+    else if (this.ws && this.ws.readyState === WebSocket.OPEN && !this.transferStopped) {
+      try {
+        this.sendSignalingMessage({
+          type: 'data',
+          data: JSON.parse(data), // data应该是JSON字符串
+          roomId: this.roomId
+        });
+        console.log('Data sent via WebSocket to CLI');
+        return true;
+      } catch (error) {
+        console.error('Error sending data via WebSocket:', error);
+        // 如果是传输错误，停止继续发送
+        if (this.onError) {
+          this.onError({
+            type: '传输错误',
+            message: '无法发送数据到CLI端'
+          });
+        }
         return false;
       }
     } else {
-      console.warn('DataChannel not available or not open');
+      console.warn('No available connection for sending data (transferStopped:', this.transferStopped, ')');
       return false;
     }
   }

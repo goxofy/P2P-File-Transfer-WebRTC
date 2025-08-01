@@ -1,0 +1,69 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install pkg globally
+      run: npm install -g pkg
+      
+    - name: Build binaries
+      run: |
+        mkdir -p dist
+        pkg cli/index.js \
+          --targets node18-linux-x64,node18-linux-x86,node18-linux-arm64,node18-macos-x64,node18-macos-arm64,node18-win-x64,node18-win-x86 \
+          --out-path dist \
+          --compress GZip
+          
+    - name: Rename binaries
+      run: |
+        cd dist
+        mv index-linux p2p-transfer-linux-x64 || true
+        mv index-linux-x86 p2p-transfer-linux-x86 || true
+        mv index-linux-arm64 p2p-transfer-linux-arm64 || true
+        mv index-macos p2p-transfer-macos-x64 || true
+        mv index-macos-arm64 p2p-transfer-macos-arm64 || true
+        mv index-win.exe p2p-transfer-windows-x64.exe || true
+        mv index-win-x86.exe p2p-transfer-windows-x86.exe || true
+        ls -la
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: p2p-transfer-binaries
+        path: dist/*
+        
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/p2p-transfer-linux-x64
+          dist/p2p-transfer-linux-x86
+          dist/p2p-transfer-linux-arm64
+          dist/p2p-transfer-macos-x64
+          dist/p2p-transfer-macos-arm64
+          dist/p2p-transfer-windows-x64.exe
+          dist/p2p-transfer-windows-x86.exe
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

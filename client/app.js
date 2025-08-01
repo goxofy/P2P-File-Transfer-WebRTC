@@ -3,6 +3,7 @@ class WebRTCApp {
     this.webrtcManager = new WebRTCManager();
     this.fileTransfer = new FileTransferManager(this.webrtcManager);
     this.isConnected = false;
+    this.connectionType = 'none'; // 'none', 'webrtc', 'cli'
     this.transferItems = new Map(); // 存储传输项目，key: transferId, value: element
     
     this.initializeEventHandlers();
@@ -91,10 +92,31 @@ class WebRTCApp {
   setupWebRTCCallbacks() {
     this.webrtcManager.onConnectionStateChange = (state) => {
       this.updateConnectionStatus(state);
-      this.log(`连接状态: ${state}`, state === 'connected' ? 'success' : 'info');
+      
+      if (state === 'connected-cli') {
+        this.connectionType = 'cli';
+        this.log('已连接到CLI客户端，可以进行文件传输', 'success');
+        this.showTransferSection();
+      } else if (state === 'connected') {
+        this.connectionType = 'webrtc';
+        this.log(`连接状态: ${state}`, 'success');
+      } else if (state === 'disconnected') {
+        this.connectionType = 'none';
+        this.log('连接已断开', 'info');
+        // 停止所有正在进行的传输
+        this.fileTransfer.stopAllTransfers();
+        // 隐藏传输区域
+        document.getElementById('transfer-section').style.display = 'none';
+        // 更新UI显示等待状态
+        this.updateUI();
+      } else {
+        this.connectionType = 'none';
+        this.log(`连接状态: ${state}`, 'info');
+      }
     };
     
     this.webrtcManager.onDataChannelOpen = () => {
+      this.connectionType = 'webrtc';
       this.log('数据通道已建立，可以开始传输文件', 'success');
       this.showTransferSection();
     };
@@ -104,6 +126,12 @@ class WebRTCApp {
       
       // 根据错误类型采取不同处理
       if (error.type === '重连失败') {
+        this.updateConnectionStatus('disconnected');
+        this.isConnected = false;
+        this.updateUI();
+      } else if (error.type === '传输错误') {
+        // 停止所有正在进行的传输
+        this.fileTransfer.stopAllTransfers();
         this.updateConnectionStatus('disconnected');
         this.isConnected = false;
         this.updateUI();
@@ -184,8 +212,11 @@ class WebRTCApp {
   }
   
   disconnect() {
+    // 停止所有正在进行的传输
+    this.fileTransfer.stopAllTransfers();
     this.webrtcManager.disconnect();
     this.isConnected = false;
+    this.connectionType = 'none';
     this.updateConnectionStatus('disconnected');
     this.updateUI();
     this.log('已断开连接', 'info');
@@ -201,10 +232,13 @@ class WebRTCApp {
       return;
     }
     
-    // 检查DataChannel是否已建立
-    if (!this.webrtcManager.dataChannel || this.webrtcManager.dataChannel.readyState !== 'open') {
-      this.log('数据通道未建立，无法发送文件。请确保另一个用户已连接到相同房间。', 'error');
-      alert('数据通道未建立！请确保另一个用户已连接到相同房间。');
+    // 检查连接状态 - 支持WebRTC和CLI模式
+    const hasConnection = (this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open') ||
+                         (this.webrtcManager.ws && this.webrtcManager.ws.readyState === WebSocket.OPEN);
+    
+    if (!hasConnection) {
+      this.log('没有可用的连接，无法发送文件。请确保另一个用户已连接到相同房间。', 'error');
+      alert('没有可用的连接！请确保另一个用户已连接到相同房间。');
       return;
     }
     
@@ -336,6 +370,10 @@ class WebRTCApp {
       case 'connected':
         statusElement.textContent = '已连接';
         break;
+      case 'connected-cli':
+        statusElement.textContent = '已连接(CLI)';
+        statusElement.className = `status connected`; // 使用connected样式
+        break;
       default:
         statusElement.textContent = status;
     }
@@ -351,8 +389,16 @@ class WebRTCApp {
       connectBtn.style.display = 'none';
       disconnectBtn.style.display = 'inline-block';
       
-      // 如果还没有数据通道，显示等待状态
-      if (!this.webrtcManager.dataChannel || this.webrtcManager.dataChannel.readyState !== 'open') {
+      // 根据连接类型显示相应状态
+      if (this.connectionType === 'cli') {
+        // CLI模式 - 不需要等待DataChannel
+        transferSection.style.display = 'block';
+        const dropContent = dropZone.querySelector('.drop-content p');
+        dropContent.textContent = '已连接到CLI客户端，可以拖拽文件到这里或点击选择文件';
+        dropZone.style.borderColor = '#27ae60';
+        dropZone.style.backgroundColor = '#ffffff';
+      } else if (!this.webrtcManager.dataChannel || this.webrtcManager.dataChannel.readyState !== 'open') {
+        // WebRTC模式 - 等待DataChannel建立
         transferSection.style.display = 'block';
         const dropContent = dropZone.querySelector('.drop-content p');
         dropContent.textContent = '等待另一个用户连接以建立数据通道...';
