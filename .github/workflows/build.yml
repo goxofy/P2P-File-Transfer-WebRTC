@@ -14,12 +14,24 @@ jobs:
           - runner: ubuntu-latest
             target: node18-linux-x64
             output: p2p-transfer-linux-x64
+          - runner: ubuntu-latest
+            target: node18-linux-x86
+            output: p2p-transfer-linux-x86
+          - runner: ubuntu-latest
+            target: node18-linux-arm64
+            output: p2p-transfer-linux-arm64
           - runner: macos-latest
             target: node18-macos-x64
             output: p2p-transfer-macos-x64
+          - runner: macos-14
+            target: node18-macos-arm64
+            output: p2p-transfer-macos-arm64
           - runner: windows-latest
             target: node18-win-x64
             output: p2p-transfer-windows-x64.exe
+          - runner: windows-latest
+            target: node18-win-x86
+            output: p2p-transfer-windows-x86.exe
     
     runs-on: ${{ matrix.runner }}
     
@@ -56,9 +68,18 @@ jobs:
         if [ -f "index-linux" ]; then
           mv index-linux ${{ matrix.output }}
           echo "Renamed index-linux to ${{ matrix.output }}"
+        elif [ -f "index-linux-x86" ]; then
+          mv index-linux-x86 ${{ matrix.output }}
+          echo "Renamed index-linux-x86 to ${{ matrix.output }}"
+        elif [ -f "index-linux-arm64" ]; then
+          mv index-linux-arm64 ${{ matrix.output }}
+          echo "Renamed index-linux-arm64 to ${{ matrix.output }}"
         elif [ -f "index-macos" ]; then
           mv index-macos ${{ matrix.output }}
           echo "Renamed index-macos to ${{ matrix.output }}"
+        elif [ -f "index-macos-arm64" ]; then
+          mv index-macos-arm64 ${{ matrix.output }}
+          echo "Renamed index-macos-arm64 to ${{ matrix.output }}"
         elif [ -f "index" ]; then
           mv index ${{ matrix.output }}
           echo "Renamed index to ${{ matrix.output }}"
@@ -76,6 +97,9 @@ jobs:
         if (Test-Path "index-win.exe") {
           Move-Item "index-win.exe" "${{ matrix.output }}"
           Write-Host "Renamed index-win.exe to ${{ matrix.output }}"
+        } elseif (Test-Path "index-win-x86.exe") {
+          Move-Item "index-win-x86.exe" "${{ matrix.output }}"
+          Write-Host "Renamed index-win-x86.exe to ${{ matrix.output }}"
         } elseif (Test-Path "index.exe") {
           Move-Item "index.exe" "${{ matrix.output }}"
           Write-Host "Renamed index.exe to ${{ matrix.output }}"
