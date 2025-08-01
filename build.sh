@@ -64,13 +64,21 @@ cd dist
 case "$OS" in
   Darwin)
     if [[ "$ARCH" == "arm64" ]]; then
+      # macOS ARM64 的输出文件通常叫 index-macos-arm64 或 index
       if [ -f "index-macos-arm64" ]; then
         mv index-macos-arm64 p2p-transfer-macos-arm64
         echo "✅ macOS ARM64: p2p-transfer-macos-arm64"
+      elif [ -f "index" ]; then
+        mv index p2p-transfer-macos-arm64
+        echo "✅ macOS ARM64: p2p-transfer-macos-arm64"
       fi
     else
+      # macOS x64 的输出文件通常叫 index-macos 或 index
       if [ -f "index-macos" ]; then
         mv index-macos p2p-transfer-macos-x64
+        echo "✅ macOS x64: p2p-transfer-macos-x64"
+      elif [ -f "index" ]; then
+        mv index p2p-transfer-macos-x64
         echo "✅ macOS x64: p2p-transfer-macos-x64"
       fi
     fi
@@ -80,15 +88,24 @@ case "$OS" in
       if [ -f "index-linux-arm64" ]; then
         mv index-linux-arm64 p2p-transfer-linux-arm64
         echo "✅ Linux ARM64: p2p-transfer-linux-arm64"
+      elif [ -f "index" ]; then
+        mv index p2p-transfer-linux-arm64
+        echo "✅ Linux ARM64: p2p-transfer-linux-arm64"
       fi
     elif [[ "$ARCH" == "i386" || "$ARCH" == "i686" ]]; then
       if [ -f "index-linux-x86" ]; then
         mv index-linux-x86 p2p-transfer-linux-x86
         echo "✅ Linux x86: p2p-transfer-linux-x86"
+      elif [ -f "index" ]; then
+        mv index p2p-transfer-linux-x86
+        echo "✅ Linux x86: p2p-transfer-linux-x86"
       fi
     else
       if [ -f "index-linux" ]; then
         mv index-linux p2p-transfer-linux-x64
+        echo "✅ Linux x64: p2p-transfer-linux-x64"
+      elif [ -f "index" ]; then
+        mv index p2p-transfer-linux-x64
         echo "✅ Linux x64: p2p-transfer-linux-x64"
       fi
     fi
