@@ -52,19 +52,41 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         cd dist
+        ls -la
         if [ -f "index-linux" ]; then
           mv index-linux ${{ matrix.output }}
+          echo "Renamed index-linux to ${{ matrix.output }}"
         elif [ -f "index-macos" ]; then
           mv index-macos ${{ matrix.output }}
+          echo "Renamed index-macos to ${{ matrix.output }}"
+        elif [ -f "index" ]; then
+          mv index ${{ matrix.output }}
+          echo "Renamed index to ${{ matrix.output }}"
+        else
+          echo "No binary found to rename"
+          exit 1
         fi
+        ls -la
         
     - name: Rename binary (Windows)
       if: runner.os == 'Windows'
       run: |
         cd dist
+        Get-ChildItem -Force
         if (Test-Path "index-win.exe") {
           Move-Item "index-win.exe" "${{ matrix.output }}"
+          Write-Host "Renamed index-win.exe to ${{ matrix.output }}"
+        } elseif (Test-Path "index.exe") {
+          Move-Item "index.exe" "${{ matrix.output }}"
+          Write-Host "Renamed index.exe to ${{ matrix.output }}"
+        } elseif (Test-Path "index") {
+          Move-Item "index" "${{ matrix.output }}"
+          Write-Host "Renamed index to ${{ matrix.output }}"
+        } else {
+          Write-Host "No binary found to rename"
+          exit 1
         }
+        Get-ChildItem -Force
       shell: powershell
         
     - name: Upload artifacts
