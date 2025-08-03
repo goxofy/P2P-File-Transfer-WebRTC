@@ -8,10 +8,21 @@ class WebRTCManager {
     this.isInitiator = false;
     this.transferStopped = false; // 传输停止标志
     
-    // ICE 服务器配置 (使用免费的 STUN 服务器)
+    // ICE 服务器配置 (使用免费的 STUN 和 TURN 服务器)
     this.iceServers = [
       { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
+      { urls: 'stun:stun1.l.google.com:19302' },
+      // 使用免费的 TURN 服务器 (有限配额)
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject', 
+        credential: 'openrelayproject'
+      }
     ];
     
     // 事件回调
@@ -222,9 +233,68 @@ class WebRTCManager {
     
     // 连接状态变化
     this.peerConnection.onconnectionstatechange = () => {
-      console.log('Connection state:', this.peerConnection.connectionState);
+      const state = this.peerConnection.connectionState;
+      console.log(`[WebRTC] 连接状态变更: ${state}`);
+      
+      // 详细状态说明
+      switch(state) {
+        case 'connecting':
+          console.log('[WebRTC] 正在尝试建立P2P连接...');
+          break;
+        case 'connected':
+          console.log('[WebRTC] ✅ P2P连接建立成功！数据将直接传输');
+          break;
+        case 'disconnected':
+          console.log('[WebRTC] ⚠️ P2P连接断开，可能会重连');
+          break;
+        case 'failed':
+          console.log('[WebRTC] ❌ P2P连接失败，将使用服务器中继传输');
+          console.log('[WebRTC] 提示：这通常是由于NAT/防火墙导致的，文件仍可正常传输');
+          break;
+        case 'closed':
+          console.log('[WebRTC] P2P连接已关闭');
+          break;
+      }
+      
       if (this.onConnectionStateChange) {
-        this.onConnectionStateChange(this.peerConnection.connectionState);
+        this.onConnectionStateChange(state);
+      }
+    };
+    
+    // ICE连接状态变化 (更底层的连接状态)
+    this.peerConnection.oniceconnectionstatechange = () => {
+      const iceState = this.peerConnection.iceConnectionState;
+      console.log(`[ICE] 连接状态: ${iceState}`);
+      
+      switch(iceState) {
+        case 'checking':
+          console.log('[ICE] 正在检查连接路径...');
+          break;
+        case 'connected':
+          console.log('[ICE] ✅ ICE连接成功');
+          break;
+        case 'completed':
+          console.log('[ICE] ✅ ICE连接完成，找到最佳路径');
+          break;
+        case 'failed':
+          console.log('[ICE] ❌ ICE连接失败，NAT穿透不成功');
+          break;
+        case 'disconnected':
+          console.log('[ICE] ⚠️ ICE连接断开');
+          break;
+        case 'closed':
+          console.log('[ICE] ICE连接已关闭');
+          break;
+      }
+    };
+    
+    // ICE候选者收集
+    this.peerConnection.onicegatheringstatechange = () => {
+      const gatheringState = this.peerConnection.iceGatheringState;
+      console.log(`[ICE] 候选者收集状态: ${gatheringState}`);
+      
+      if (gatheringState === 'complete') {
+        console.log('[ICE] ICE候选者收集完成');
       }
     };
     

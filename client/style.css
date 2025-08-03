@@ -78,6 +78,35 @@ button:hover {
     background-color: #f0f0f0;
 }
 
+/* 连接状态指示器 */
+.connection-status {
+    margin-top: 15px;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+}
+
+.connection-status.p2p {
+    border-color: #008000;
+    color: #008000;
+}
+
+.connection-status.relay {
+    border-color: #ff8c00;
+    color: #ff8c00;
+}
+
+.connection-status.disconnected {
+    border-color: #ff0000;
+    color: #ff0000;
+}
+
+#connection-indicator {
+    font-size: 12px;
+    margin-right: 8px;
+}
+
 .status {
     display: inline;
     font-weight: bold;

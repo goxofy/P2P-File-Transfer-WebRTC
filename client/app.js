@@ -92,6 +92,7 @@ class WebRTCApp {
   setupWebRTCCallbacks() {
     this.webrtcManager.onConnectionStateChange = (state) => {
       this.updateConnectionStatus(state);
+      this.updateConnectionIndicator(state);
       
       if (state === 'connected-cli') {
         this.connectionType = 'cli';
@@ -99,7 +100,14 @@ class WebRTCApp {
         this.showTransferSection();
       } else if (state === 'connected') {
         this.connectionType = 'webrtc';
-        this.log(`连接状态: ${state}`, 'success');
+        this.log('✅ P2P连接建立成功！文件将直接传输', 'success');
+        this.showTransferSection();
+      } else if (state === 'failed') {
+        this.connectionType = 'websocket';
+        this.log('⚠️ P2P连接失败，使用服务器中继模式传输', 'warning');
+        this.log('提示：文件仍可正常传输，但会通过服务器中转', 'info');
+        // P2P失败后，仍然可以使用WebSocket传输
+        this.showTransferSection();
       } else if (state === 'disconnected') {
         this.connectionType = 'none';
         this.log('连接已断开', 'info');
@@ -376,6 +384,42 @@ class WebRTCApp {
         break;
       default:
         statusElement.textContent = status;
+    }
+  }
+  
+  updateConnectionIndicator(state) {
+    const indicator = document.getElementById('connection-status');
+    const indicatorDot = document.getElementById('connection-indicator');
+    const indicatorText = document.getElementById('connection-text');
+    
+    // 显示指示器
+    indicator.style.display = 'block';
+    
+    // 清除之前的样式
+    indicator.className = 'connection-status';
+    
+    switch (state) {
+      case 'connected':
+        indicator.classList.add('p2p');
+        indicatorText.textContent = 'P2P 直连模式';
+        break;
+      case 'connected-cli':
+        indicator.classList.add('p2p');
+        indicatorText.textContent = 'CLI 连接模式';
+        break;
+      case 'failed':
+        indicator.classList.add('relay');
+        indicatorText.textContent = '服务器中继模式';
+        break;
+      case 'disconnected':
+        indicator.classList.add('disconnected');
+        indicatorText.textContent = '连接已断开';
+        break;
+      case 'connecting':
+        indicatorText.textContent = '正在连接...';
+        break;
+      default:
+        indicatorText.textContent = `状态: ${state}`;
     }
   }
   
