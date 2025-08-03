@@ -388,39 +388,17 @@ class WebRTCApp {
   }
   
   updateConnectionIndicator(state) {
-    const indicator = document.getElementById('connection-status');
-    const indicatorDot = document.getElementById('connection-indicator');
-    const indicatorText = document.getElementById('connection-text');
+    // 所有状态信息都通过Connection Log显示，不再使用单独的指示器
+    const logMessage = {
+      'connected': '✅ P2P直连模式已建立',
+      'connected-cli': '🔗 CLI连接模式已建立',
+      'failed': '⚠️ 使用服务器中继模式',
+      'disconnected': '❌ 连接已断开',
+      'connecting': '⏳ 正在建立连接...'
+    };
     
-    // 显示指示器
-    indicator.style.display = 'block';
-    
-    // 清除之前的样式
-    indicator.className = 'connection-status';
-    
-    switch (state) {
-      case 'connected':
-        indicator.classList.add('p2p');
-        indicatorText.textContent = 'P2P 直连模式';
-        break;
-      case 'connected-cli':
-        indicator.classList.add('p2p');
-        indicatorText.textContent = 'CLI 连接模式';
-        break;
-      case 'failed':
-        indicator.classList.add('relay');
-        indicatorText.textContent = '服务器中继模式';
-        break;
-      case 'disconnected':
-        indicator.classList.add('disconnected');
-        indicatorText.textContent = '连接已断开';
-        break;
-      case 'connecting':
-        indicatorText.textContent = '正在连接...';
-        break;
-      default:
-        indicatorText.textContent = `状态: ${state}`;
-    }
+    const message = logMessage[state] || `状态: ${state}`;
+    this.log(message, 'info');
   }
   
   updateUI() {
