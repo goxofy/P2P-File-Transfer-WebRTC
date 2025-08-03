@@ -40,7 +40,8 @@ class P2PTransfer extends EventEmitter {
         // 加入房间
         this.sendMessage({
           type: 'join-room',
-          roomId: this.roomId
+          roomId: this.roomId,
+          clientType: 'cli'
         });
         
         resolve();
@@ -94,6 +95,8 @@ class P2PTransfer extends EventEmitter {
           });
           this.peerConnected = true;
           this.log(`可以进行文件传输`, 'success');
+          // 立即触发peer-connected事件，因为已经有客户端在房间
+          this.emit('peer-connected');
         }
         break;
         

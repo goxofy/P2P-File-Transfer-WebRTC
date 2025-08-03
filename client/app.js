@@ -80,7 +80,10 @@ class WebRTCApp {
     });
     
     dropZone.addEventListener('click', () => {
-      document.getElementById('file-input').click();
+      // 只有在连接建立后才允许点击选择文件
+      if (this.connectionType !== 'none') {
+        document.getElementById('file-input').click();
+      }
     });
     
     // 清空日志
@@ -419,7 +422,7 @@ class WebRTCApp {
         // CLI模式 - 不需要等待DataChannel
         transferSection.style.display = 'block';
         const dropContent = dropZone.querySelector('.drop-content p');
-        dropContent.textContent = '已连接到CLI客户端，可以拖拽文件到这里或点击选择文件';
+        dropContent.textContent = '已连接到CLI客户端，可以开始传输文件';
         dropZone.style.borderColor = '#27ae60';
         dropZone.style.backgroundColor = '#ffffff';
       } else if (this.connectionType === 'websocket') {
@@ -481,7 +484,7 @@ class WebRTCApp {
       fileInput.style.display = 'none';
       const dropContent = dropZone.querySelector('.drop-content p');
       if (this.connectionType === 'cli') {
-        dropContent.textContent = '已连接到CLI客户端，可以拖拽文件到这里或点击选择文件';
+        dropContent.textContent = '已连接到CLI客户端，可以开始传输文件';
       } else {
         dropContent.textContent = '服务器中继模式已建立，可以开始传输文件';
       }
@@ -495,7 +498,7 @@ class WebRTCApp {
       selectBtn.style.display = 'inline-block';
       fileInput.style.display = 'none';
       const dropContent = dropZone.querySelector('.drop-content p');
-      dropContent.textContent = '数据通道已建立，可以拖拽文件到这里或点击选择文件';
+      dropContent.textContent = '数据通道已建立，可以开始传输文件';
       dropZone.style.borderColor = '#27ae60';
       dropZone.style.backgroundColor = '#f0fff4';
     } else {
