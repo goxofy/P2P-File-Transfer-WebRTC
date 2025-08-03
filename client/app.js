@@ -365,25 +365,28 @@ class WebRTCApp {
   }
   
   updateConnectionStatus(status) {
+    // 所有状态通过日志系统显示，这里只更新元素文本
     const statusElement = document.getElementById('connection-status');
-    statusElement.className = `status ${status}`;
-    
-    switch (status) {
-      case 'disconnected':
-        statusElement.textContent = '未连接';
-        break;
-      case 'connecting':
-        statusElement.textContent = '连接中...';
-        break;
-      case 'connected':
-        statusElement.textContent = '已连接';
-        break;
-      case 'connected-cli':
-        statusElement.textContent = '已连接(CLI)';
-        statusElement.className = `status connected`; // 使用connected样式
-        break;
-      default:
-        statusElement.textContent = status;
+    if (statusElement) {
+      statusElement.className = `status ${status}`;
+      
+      switch (status) {
+        case 'disconnected':
+          statusElement.textContent = '未连接';
+          break;
+        case 'connecting':
+          statusElement.textContent = '连接中...';
+          break;
+        case 'connected':
+          statusElement.textContent = '已连接';
+          break;
+        case 'connected-cli':
+          statusElement.textContent = '已连接(CLI)';
+          statusElement.className = `status connected`;
+          break;
+        default:
+          statusElement.textContent = status;
+      }
     }
   }
   
