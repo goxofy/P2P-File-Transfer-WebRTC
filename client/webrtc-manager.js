@@ -9,25 +9,20 @@ class WebRTCManager {
     this.transferStopped = false; // 传输停止标志
     
     // ICE 服务器配置
-    // 默认使用自建 STUN/TURN 服务器，可以根据需要修改
     this.iceServers = [
-      // 自建 STUN 服务器 (推荐)
-      { urls: 'stun:localhost:3478' },
+      // 主要STUN服务器
+      { urls: 'stun:stun.miwifi.com:3478' },
       
-      // 自建 TURN 服务器 (推荐)
+      // 主要TURN服务器
       {
-        urls: 'turn:localhost:3478',
+        urls: 'turn:turn.cloudflare.com:3478',
         username: 'webrtc',
         credential: 'webrtc-secret'
       },
       
-      // 备用免费服务器（国内网络可能不稳定）
+      // 备用服务器
       { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      
-      // 国内可用服务器
-      { urls: 'stun:stun.qq.com:3478' },
-      { urls: 'stun:stun.126.net:3478' }
+      { urls: 'stun:stun1.l.google.com:19302' }
     ];
     
     // 事件回调
