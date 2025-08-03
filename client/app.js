@@ -422,9 +422,16 @@ class WebRTCApp {
         dropContent.textContent = '已连接到CLI客户端，可以拖拽文件到这里或点击选择文件';
         dropZone.style.borderColor = '#27ae60';
         dropZone.style.backgroundColor = '#ffffff';
-      } else if (!this.webrtcManager.dataChannel || this.webrtcManager.dataChannel.readyState !== 'open') {
+      } else {
         // WebRTC模式 - 等待DataChannel建立
         transferSection.style.display = 'block';
+        const dropZone = document.getElementById('file-drop-zone');
+        const selectBtn = document.getElementById('select-file-btn');
+        const fileInput = document.getElementById('file-input');
+        
+        dropZone.style.display = 'block';
+        selectBtn.style.display = 'none';
+        fileInput.style.display = 'none';
         const dropContent = dropZone.querySelector('.drop-content p');
         dropContent.textContent = '等待另一个用户连接以建立数据通道...';
         dropZone.style.borderColor = '#f39c12';
@@ -444,14 +451,45 @@ class WebRTCApp {
   }
   
   showTransferSection() {
-    document.getElementById('transfer-section').style.display = 'block';
-    
-    // 更新文件传输区域的状态提示
+    const transferSection = document.getElementById('transfer-section');
     const dropZone = document.getElementById('file-drop-zone');
-    const dropContent = dropZone.querySelector('.drop-content p');
-    dropContent.textContent = '数据通道已建立，可以拖拽文件到这里或点击选择文件';
-    dropZone.style.borderColor = '#27ae60';
-    dropZone.style.backgroundColor = '#f0fff4';
+    const selectBtn = document.getElementById('select-file-btn');
+    const fileInput = document.getElementById('file-input');
+    
+    // 显示传输区域，但隐藏文件选择功能
+    transferSection.style.display = 'block';
+    
+    // 根据连接状态决定显示内容
+    if (this.connectionType === 'cli') {
+      // CLI连接模式，直接允许文件传输
+      dropZone.style.display = 'block';
+      selectBtn.style.display = 'inline-block';
+      fileInput.style.display = 'none';
+      const dropContent = dropZone.querySelector('.drop-content p');
+      dropContent.textContent = '已连接到CLI客户端，可以拖拽文件到这里或点击选择文件';
+      dropZone.style.borderColor = '#27ae60';
+      dropZone.style.backgroundColor = '#f0fff4';
+    } else if (this.connectionType === 'webrtc' && 
+               this.webrtcManager.dataChannel && 
+               this.webrtcManager.dataChannel.readyState === 'open') {
+      // WebRTC数据通道已建立
+      dropZone.style.display = 'block';
+      selectBtn.style.display = 'inline-block';
+      fileInput.style.display = 'none';
+      const dropContent = dropZone.querySelector('.drop-content p');
+      dropContent.textContent = '数据通道已建立，可以拖拽文件到这里或点击选择文件';
+      dropZone.style.borderColor = '#27ae60';
+      dropZone.style.backgroundColor = '#f0fff4';
+    } else {
+      // 等待连接状态
+      dropZone.style.display = 'block';
+      selectBtn.style.display = 'none';
+      fileInput.style.display = 'none';
+      const dropContent = dropZone.querySelector('.drop-content p');
+      dropContent.textContent = '等待另一个用户连接以建立数据通道...';
+      dropZone.style.borderColor = '#f39c12';
+      dropZone.style.backgroundColor = '#fefcf3';
+    }
   }
   
   generateRoomId() {

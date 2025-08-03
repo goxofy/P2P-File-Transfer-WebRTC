@@ -1,7 +1,7 @@
 class FileTransferManager {
   constructor(webrtcManager) {
     this.webrtcManager = webrtcManager;
-    this.chunkSize = 16384; // 16KB chunks (safe for most browsers)
+    this.chunkSize = 8192; // 8KB chunks (更小的块避免队列溢出)
     this.activeTransfers = new Map();
     this.receivingFiles = new Map();
     
@@ -48,7 +48,7 @@ class FileTransferManager {
     this.sendMessage(fileInfoMessage);
     
     // 给接收端一些时间处理 file-info 消息
-    await this.delay(10);
+    await this.delay(100);
     
     // 读取文件并分块发送
     const arrayBuffer = await this.readFileAsArrayBuffer(file);
@@ -61,7 +61,7 @@ class FileTransferManager {
       startTime: Date.now()
     });
     
-    // 发送文件块
+    // 发送文件块 - 使用流量控制避免队列溢出
     for (let i = 0; i < totalChunks; i++) {
       // 检查传输是否已被停止
       const transfer = this.activeTransfers.get(transferId);
@@ -73,6 +73,9 @@ class FileTransferManager {
       const start = i * this.chunkSize;
       const end = Math.min(start + this.chunkSize, arrayBuffer.byteLength);
       const chunk = arrayBuffer.slice(start, end);
+      
+      // 等待DataChannel缓冲区可用
+      await this.waitForBufferSpace();
       
       const success = this.sendMessage({
         type: 'file-chunk',
@@ -111,9 +114,9 @@ class FileTransferManager {
         });
       }
       
-      // 小延迟避免阻塞浏览器
-      if (i % 10 === 0) {
-        await this.delay(1);
+      // 更大的延迟避免队列溢出
+      if (i % 5 === 0) {
+        await this.delay(10);
       }
     }
     
@@ -454,7 +457,17 @@ class FileTransferManager {
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
-  
+
+  // 等待DataChannel缓冲区空间
+  async waitForBufferSpace() {
+    if (!this.webrtcManager.dataChannel) return;
+    
+    // 检查缓冲区状态
+    while (this.webrtcManager.dataChannel.bufferedAmount > 1024 * 1024) { // 1MB阈值
+      await this.delay(50);
+    }
+  }
+
   // 停止所有正在进行的传输
   stopAllTransfers() {
     console.log('Stopping all active transfers, current count:', this.activeTransfers.size);
