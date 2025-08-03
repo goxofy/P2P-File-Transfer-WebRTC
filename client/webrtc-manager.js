@@ -27,6 +27,8 @@ class WebRTCManager {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 3;
     this.reconnectDelay = 2000;
+    this.heartbeatInterval = null;
+    this.lastPingTime = 0;
   }
   
   generateId() {
@@ -52,6 +54,9 @@ class WebRTCManager {
           console.log('Connected to signaling server');
           clearTimeout(this.connectionTimeout);
           this.reconnectAttempts = 0;
+          
+          // 启动心跳检测
+          this.startHeartbeat();
           resolve();
         };
         
@@ -140,6 +145,7 @@ class WebRTCManager {
           // Web客户端加入，作为接收方初始化WebRTC连接
           console.log('Initializing WebRTC as receiver');
           await this.initializePeerConnection();
+          this.startP2PTimeout();
         }
         break;
         
@@ -223,6 +229,24 @@ class WebRTCManager {
     // 连接状态变化
     this.peerConnection.onconnectionstatechange = () => {
       console.log('Connection state:', this.peerConnection.connectionState);
+      
+      // 处理P2P连接失败，尝试回退到中转模式
+      if (this.peerConnection.connectionState === 'failed' || 
+          this.peerConnection.connectionState === 'disconnected' ||
+          this.peerConnection.connectionState === 'closed') {
+        
+        console.log('P2P连接失败，检查是否可以回退到中转模式');
+        this.p2pFailed = true;
+        
+        // 清除P2P连接超时
+        if (this.p2pConnectionTimeout) {
+          clearTimeout(this.p2pConnectionTimeout);
+        }
+        
+        // 检查是否有CLI客户端，回退到中转模式
+        this.checkFallbackToRelay();
+      }
+      
       if (this.onConnectionStateChange) {
         this.onConnectionStateChange(this.peerConnection.connectionState);
       }
@@ -241,6 +265,7 @@ class WebRTCManager {
         ordered: true
       });
       this.setupDataChannel(this.dataChannel);
+      this.startP2PTimeout();
     } else {
       console.log('Waiting for DataChannel as receiver');
     }
@@ -481,6 +506,103 @@ class WebRTCManager {
     };
   }
 
+  // 启动心跳检测
+  startHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    
+    // 每30秒发送一次心跳
+    this.heartbeatInterval = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.sendSignalingMessage({ type: 'ping' });
+        this.lastPingTime = Date.now();
+      }
+    }, 30000);
+  }
+  
+  // 停止心跳检测
+  stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+  
+  // 完全断开连接
+  disconnect() {
+    this.stopHeartbeat();
+    
+    if (this.peerConnection) {
+      this.peerConnection.close();
+      this.peerConnection = null;
+    }
+    
+    if (this.dataChannel) {
+      this.dataChannel.close();
+      this.dataChannel = null;
+    }
+    
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.close(1000, 'Normal closure');
+    }
+    
+    this.ws = null;
+    this.roomId = null;
+    this.isInitiator = false;
+  }
+
+  // P2P连接超时处理
+  startP2PTimeout() {
+    if (this.p2pConnectionTimeout) {
+      clearTimeout(this.p2pConnectionTimeout);
+    }
+    
+    // 设置P2P连接超时（30秒）
+    this.p2pConnectionTimeout = setTimeout(() => {
+      if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+        console.log('P2P连接超时，准备回退到中转模式');
+        this.p2pFailed = true;
+        this.checkFallbackToRelay();
+      }
+    }, 30000); // 30秒超时
+  }
+  
+  // 检查并回退到中转模式
+  checkFallbackToRelay() {
+    console.log('正在尝试回退到中转模式...');
+    
+    // 关闭失败的P2P连接
+    this.closePeerConnection();
+    
+    // 通知应用回退到中转模式
+    if (this.onConnectionStateChange) {
+      this.onConnectionStateChange('fallback-to-relay');
+    }
+    
+    // 使用WebSocket中转模式
+    if (this.onConnectionStateChange) {
+      this.onConnectionStateChange('connected-cli');
+    }
+    
+    console.log('已回退到中转模式');
+  }
+  
+  // 关闭P2P连接但保持WebSocket连接
+  closePeerConnection() {
+    if (this.peerConnection) {
+      this.peerConnection.close();
+      this.peerConnection = null;
+    }
+    
+    if (this.dataChannel) {
+      this.dataChannel.close();
+      this.dataChannel = null;
+    }
+    
+    this.isInitiator = false;
+  }
+  
   // 延迟工具方法
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));

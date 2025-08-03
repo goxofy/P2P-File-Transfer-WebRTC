@@ -100,6 +100,11 @@ class WebRTCApp {
         this.connectionType = 'webrtc';
         this.fileTransfer.setConnectionType('p2p');
         this.log('[P2P模式] WebRTC数据通道已建立，点对点直接传输', 'success');
+      } else if (state === 'fallback-to-relay') {
+        this.connectionType = 'cli';
+        this.fileTransfer.setConnectionType('cli');
+        this.log('[回退成功] P2P连接失败，已自动回退到中转模式', 'warning');
+        this.showTransferSection();
       } else if (state === 'connecting') {
         this.connectionType = 'none';
         this.fileTransfer.setConnectionType('p2p');

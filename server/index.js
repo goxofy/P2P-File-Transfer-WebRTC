@@ -14,8 +14,63 @@ const rooms = new Map();
 const clients = new Map();
 const activeTransfers = new Map(); // 跟踪活跃的传输
 
+// 心跳配置
+const HEARTBEAT_INTERVAL = 30000; // 30秒心跳间隔
+const HEARTBEAT_TIMEOUT = 10000; // 10秒心跳超时
+const TRANSFER_TIMEOUT = 600000; // 10分钟传输超时
+
+// 心跳检测函数
+function heartbeat() {
+  this.isAlive = true;
+}
+
+// 定期心跳检测
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (!ws.isAlive) {
+      console.log('心跳超时，强制断开连接');
+      ws.terminate();
+      handleLeave(ws);
+      return;
+    }
+    
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, HEARTBEAT_INTERVAL);
+
+// 定期清理超时传输
+const transferCleanupInterval = setInterval(() => {
+  const now = Date.now();
+  activeTransfers.forEach((transfer, transferId) => {
+    if (now - transfer.startTime > TRANSFER_TIMEOUT) {
+      console.log(`传输超时清理: ${transferId}`);
+      activeTransfers.delete(transferId);
+      
+      // 通知相关客户端
+      if (transfer.senderWs && transfer.senderWs.readyState === WebSocket.OPEN) {
+        transfer.senderWs.send(JSON.stringify({
+          type: 'transfer-timeout',
+          transferId: transferId
+        }));
+      }
+      if (transfer.receiverWs && transfer.receiverWs.readyState === WebSocket.OPEN) {
+        transfer.receiverWs.send(JSON.stringify({
+          type: 'transfer-timeout',
+          transferId: transferId
+        }));
+      }
+    }
+  });
+}, TRANSFER_TIMEOUT / 2);
+
 wss.on('connection', (ws) => {
   console.log('New client connected');
+  
+  // 设置心跳相关属性
+  ws.isAlive = true;
+  ws.connectionTime = Date.now();
+  ws.on('pong', heartbeat);
   
   ws.on('message', (message) => {
     try {
@@ -40,6 +95,10 @@ wss.on('connection', (ws) => {
         case 'leave':
           handleLeave(ws);
           break;
+        case 'ping': // 处理客户端心跳
+          ws.isAlive = true;
+          ws.send(JSON.stringify({ type: 'pong' }));
+          break;
       }
     } catch (error) {
       console.error('Error parsing message:', error);
@@ -53,7 +112,23 @@ wss.on('connection', (ws) => {
   
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
+    handleLeave(ws);
   });
+  
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
+});
+
+// 清理定时器
+process.on('SIGTERM', () => {
+  clearInterval(heartbeatInterval);
+  clearInterval(transferCleanupInterval);
+});
+
+wss.on('close', () => {
+  clearInterval(heartbeatInterval);
+  clearInterval(transferCleanupInterval);
 });
 
 function handleJoinRoom(ws, data) {
