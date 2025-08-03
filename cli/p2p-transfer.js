@@ -120,6 +120,9 @@ class P2PTransfer extends EventEmitter {
       case 'room-full':
         this.log(`${message.message}`, 'error');
         this.emit('room-full', message.message);
+        // 房间满时自动退出
+        this.disconnect();
+        process.exit(1);
         break;
         
       case 'data':
@@ -159,9 +162,16 @@ class P2PTransfer extends EventEmitter {
       // 设置信号处理
       this.setupSignalHandlers();
       
-      await this.connect();
+      // 检查文件是否存在
+      const fullPath = path.resolve(filePath);
+      if (!fs.existsSync(fullPath)) {
+        this.log(`文件不存在: ${fullPath}`, 'error');
+        process.exit(1);
+      }
       
-      this.transferStopped = false; // 重置传输停止标志
+      const fileName = path.basename(fullPath);
+      const stats = fs.statSync(fullPath);
+      const fileSize = stats.size;
       
       // 设置超时退出机制（5分钟超时）
       const timeout = setTimeout(() => {
@@ -178,8 +188,15 @@ class P2PTransfer extends EventEmitter {
         process.exit(1);
       });
       
-      // 等待对等端连接
-      if (!this.peerConnected) {
+      await this.connect();
+      
+      this.transferStopped = false; // 重置传输停止标志
+      
+      // 如果已经有对等端连接，立即开始传输
+      if (this.peerConnected) {
+        this.log(`检测到已连接的接收端，开始发送文件: ${fileName}`);
+      } else {
+        // 等待对等端连接
         this.log('等待接收端连接...');
         await new Promise((resolve) => {
           this.once('peer-connected', resolve);
