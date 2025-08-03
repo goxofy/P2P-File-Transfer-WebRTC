@@ -151,9 +151,11 @@ class WebRTCManager {
         if (message.clientType === 'cli') {
           console.log('CLI client joined, establishing WebRTC for CLI↔Web communication');
           if (!this.isInitiator && !this.peerConnection) {
-            // Web端作为接收方建立WebRTC连接
-            console.log('Web端作为接收方建立WebRTC连接');
+            // Web端作为发送方建立WebRTC连接（因为CLI是接收方）
+            console.log('Web端作为发送方建立WebRTC连接');
+            this.isInitiator = true;
             await this.initializePeerConnection();
+            await this.createOffer();
           } else if (this.isInitiator) {
             // Web端已经是发起方，CLI加入后完成连接
             console.log('CLI加入，完成WebRTC连接');
