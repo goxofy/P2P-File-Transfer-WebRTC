@@ -79,8 +79,12 @@ class WebRTCApp {
       this.handleFileSelection(files);
     });
     
-    dropZone.addEventListener('click', () => {
-      document.getElementById('file-input').click();
+    // 只在点击drop-zone内的特定元素时才触发文件选择
+    dropZone.addEventListener('click', (event) => {
+      // 只在点击drop-zone本身（而不是子元素）时才触发
+      if (event.target === dropZone || event.target.classList.contains('drop-content')) {
+        document.getElementById('file-input').click();
+      }
     });
     
     // 清空日志
@@ -95,14 +99,17 @@ class WebRTCApp {
       
       if (state === 'connected-cli') {
         this.connectionType = 'cli';
-        this.log('已连接到CLI客户端，可以进行文件传输', 'success');
+        this.log('[中转模式] 已连接到CLI客户端，通过信令服务器中转传输', 'info');
         this.showTransferSection();
       } else if (state === 'connected') {
         this.connectionType = 'webrtc';
-        this.log(`连接状态: ${state}`, 'success');
+        this.log('[P2P模式] WebRTC数据通道已建立，点对点直接传输', 'success');
+      } else if (state === 'connecting') {
+        this.connectionType = 'none';
+        this.log('[连接中] 正在建立连接...', 'info');
       } else if (state === 'disconnected') {
         this.connectionType = 'none';
-        this.log('连接已断开', 'info');
+        this.log('[已断开] 连接已断开', 'info');
         // 停止所有正在进行的传输
         this.fileTransfer.stopAllTransfers();
         // 隐藏传输区域
@@ -111,13 +118,13 @@ class WebRTCApp {
         this.updateUI();
       } else {
         this.connectionType = 'none';
-        this.log(`连接状态: ${state}`, 'info');
+        this.log(`[状态] ${state}`, 'info');
       }
     };
     
     this.webrtcManager.onDataChannelOpen = () => {
       this.connectionType = 'webrtc';
-      this.log('数据通道已建立，可以开始传输文件', 'success');
+      this.log('[P2P模式] WebRTC数据通道已建立，点对点直接传输', 'success');
       this.showTransferSection();
     };
     
@@ -197,16 +204,16 @@ class WebRTCApp {
     
     try {
       this.updateConnectionStatus('connecting');
-      this.log('正在连接到信令服务器...', 'info');
+      this.log('[连接中] 正在连接到信令服务器...', 'info');
       
       await this.webrtcManager.connectToSignalingServer(serverUrl);
       this.webrtcManager.joinRoom(document.getElementById('room-id').value);
       
       this.isConnected = true;
       this.updateUI();
-      this.log('已连接到信令服务器', 'success');
+      this.log(`[已连接] 已连接到信令服务器，房间: ${document.getElementById('room-id').value}`, 'success');
     } catch (error) {
-      this.log(`连接失败: ${error.message}`, 'error');
+      this.log(`[连接失败] ${error.message}`, 'error');
       this.updateConnectionStatus('disconnected');
     }
   }
@@ -219,7 +226,7 @@ class WebRTCApp {
     this.connectionType = 'none';
     this.updateConnectionStatus('disconnected');
     this.updateUI();
-    this.log('已断开连接', 'info');
+    this.log('[已断开] 连接已断开', 'info');
   }
   
   async handleFileSelection(files) {
@@ -424,7 +431,15 @@ class WebRTCApp {
     // 更新文件传输区域的状态提示
     const dropZone = document.getElementById('file-drop-zone');
     const dropContent = dropZone.querySelector('.drop-content p');
-    dropContent.textContent = '数据通道已建立，可以拖拽文件到这里或点击选择文件';
+    
+    if (this.connectionType === 'webrtc') {
+      dropContent.textContent = '[P2P模式] WebRTC数据通道已建立，可以开始文件传输';
+    } else if (this.connectionType === 'cli') {
+      dropContent.textContent = '[中转模式] CLI客户端已连接，通过服务器中转传输';
+    } else {
+      dropContent.textContent = '连接已建立，可以拖拽文件到这里或点击选择文件';
+    }
+    
     dropZone.style.borderColor = '#27ae60';
     dropZone.style.backgroundColor = '#f0fff4';
   }

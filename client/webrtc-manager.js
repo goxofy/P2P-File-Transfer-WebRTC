@@ -325,18 +325,36 @@ class WebRTCManager {
   }
   
   // 发送数据通过 DataChannel
-  // 发送数据 (支持WebRTC和CLI模式)
-  sendData(data) {
+  // 发送数据 (支持WebRTC和CLI模式)，带队列控制和重试机制
+  async sendData(data) {
     console.log('Attempting to send data, length:', data.length, 'DataChannel state:', this.dataChannel?.readyState, 'WebSocket state:', this.ws?.readyState);
     
     // 如果有WebRTC连接，优先使用WebRTC
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
       try {
+        // 检查缓冲区状态，避免队列溢出
+        if (this.dataChannel.bufferedAmount > 0) {
+          console.log('DataChannel buffer not empty, waiting... bufferedAmount:', this.dataChannel.bufferedAmount);
+          await this.waitForBufferToClear();
+        }
+        
         this.dataChannel.send(data);
         console.log('Data sent via WebRTC DataChannel');
         return true;
       } catch (error) {
         console.error('Error sending data via WebRTC:', error);
+        // 如果是缓冲区满的错误，等待后重试
+        if (error.name === 'OperationError' && error.message.includes('send queue is full')) {
+          console.log('Buffer full, waiting and retrying...');
+          await this.delay(100); // 等待100ms
+          try {
+            this.dataChannel.send(data);
+            return true;
+          } catch (retryError) {
+            console.error('Retry failed:', retryError);
+            return false;
+          }
+        }
         return false;
       }
     } 
@@ -365,6 +383,26 @@ class WebRTCManager {
       console.warn('No available connection for sending data (transferStopped:', this.transferStopped, ')');
       return false;
     }
+  }
+
+  // 等待DataChannel缓冲区清空
+  waitForBufferToClear() {
+    return new Promise((resolve) => {
+      if (this.dataChannel.bufferedAmount === 0) {
+        resolve();
+        return;
+      }
+      
+      const checkBuffer = () => {
+        if (this.dataChannel.bufferedAmount === 0) {
+          resolve();
+        } else {
+          setTimeout(checkBuffer, 50);
+        }
+      };
+      
+      checkBuffer();
+    });
   }
   
   // 关闭连接
@@ -436,5 +474,10 @@ class WebRTCManager {
       peer: this.peerConnection ? this.peerConnection.connectionState : 'closed',
       dataChannel: this.dataChannel ? this.dataChannel.readyState : 'closed'
     };
+  }
+
+  // 延迟工具方法
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

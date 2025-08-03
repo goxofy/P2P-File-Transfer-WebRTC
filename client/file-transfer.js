@@ -45,7 +45,7 @@ class FileTransferManager {
       ...fileInfo
     };
     console.log('Sending file-info message:', fileInfoMessage);
-    this.sendMessage(fileInfoMessage);
+    await this.sendMessage(fileInfoMessage);
     
     // 给接收端一些时间处理 file-info 消息
     await this.delay(10);
@@ -74,7 +74,7 @@ class FileTransferManager {
       const end = Math.min(start + this.chunkSize, arrayBuffer.byteLength);
       const chunk = arrayBuffer.slice(start, end);
       
-      const success = this.sendMessage({
+      const success = await this.sendMessage({
         type: 'file-chunk',
         transferId: transferId,
         chunkIndex: i,
@@ -125,7 +125,7 @@ class FileTransferManager {
     }
     
     // 发送传输完成消息
-    this.sendMessage({
+    await this.sendMessage({
       type: 'file-complete',
       transferId: transferId
     });
@@ -400,8 +400,8 @@ class FileTransferManager {
     return new Blob([combinedBuffer], { type: receivingFile.info.fileType });
   }
   
-  // 发送消息
-  sendMessage(message) {
+  // 发送消息（异步）
+  async sendMessage(message) {
     const messageId = message.transferId || message.id || 'no-id';
     console.log('Sending message:', message.type, 'id:', messageId);
     
@@ -414,9 +414,15 @@ class FileTransferManager {
     
     const messageStr = JSON.stringify(message);
     console.log('Sending JSON message length:', messageStr.length);
-    const success = this.webrtcManager.sendData(messageStr);
-    console.log('Message send result:', success, 'for message type:', message.type);
-    return success;
+    
+    try {
+      const success = await this.webrtcManager.sendData(messageStr);
+      console.log('Message send result:', success, 'for message type:', message.type);
+      return success;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      return false;
+    }
   }
   
   // 工具方法
