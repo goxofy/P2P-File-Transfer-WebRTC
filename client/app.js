@@ -79,13 +79,7 @@ class WebRTCApp {
       this.handleFileSelection(files);
     });
     
-    // 只在点击drop-zone内的特定元素时才触发文件选择
-    dropZone.addEventListener('click', (event) => {
-      // 只在点击drop-zone本身（而不是子元素）时才触发
-      if (event.target === dropZone || event.target.classList.contains('drop-content')) {
-        document.getElementById('file-input').click();
-      }
-    });
+    // 完全移除drop-zone的点击事件，只允许点击Select Files按钮触发
     
     // 清空日志
     document.getElementById('clear-log').addEventListener('click', () => {
@@ -181,7 +175,11 @@ class WebRTCApp {
     };
     
     this.fileTransfer.onTransferComplete = (data) => {
-      this.log(`传输完成: ${data.fileName} (${this.formatDuration(data.duration)})`, 'success');
+      if (this.connectionType === 'cli') {
+        this.log(`[中转模式] 接收方已确认收到: ${data.fileName} (${this.formatDuration(data.duration)})`, 'success');
+      } else {
+        this.log(`[P2P模式] 传输完成: ${data.fileName} (${this.formatDuration(data.duration)})`, 'success');
+      }
     };
     
     this.fileTransfer.onTransferError = (error) => {

@@ -127,19 +127,39 @@ class FileTransferManager {
     // 发送传输完成消息
     await this.sendMessage({
       type: 'file-complete',
-      transferId: transferId
+      transferId: transferId,
+      senderId: 'web-client' // 添加发送方标识
     });
     
     const duration = Date.now() - finalTransfer.startTime;
     
-    if (this.onTransferComplete) {
-      this.onTransferComplete({
-        transferId: transferId,
-        fileName: fileInfo.name,
-        size: fileInfo.size,
-        duration: duration,
-        type: 'send'
-      });
+    // 中转模式需要等待接收方确认
+    if (this.connectionType === 'cli') {
+      if (this.onTransferProgress) {
+        this.onTransferProgress({
+          transferId: transferId,
+          fileName: fileInfo.name,
+          progress: 100,
+          sent: fileInfo.size,
+          total: fileInfo.size,
+          type: 'send',
+          status: 'waiting-confirmation' // 等待接收方确认
+        });
+      }
+      
+      // 在中转模式下，发送方需要等待接收方确认
+      this.log('[中转模式] 文件已发送完成，等待接收方确认...', 'info');
+    } else {
+      // P2P模式下可以立即完成
+      if (this.onTransferComplete) {
+        this.onTransferComplete({
+          transferId: transferId,
+          fileName: fileInfo.name,
+          size: fileInfo.size,
+          duration: duration,
+          type: 'send'
+        });
+      }
     }
     
     this.activeTransfers.delete(transferId);
@@ -209,6 +229,9 @@ class FileTransferManager {
         break;
       case 'file-complete':
         this.handleFileComplete(message);
+        break;
+      case 'file-received-confirmation':
+        this.handleFileReceivedConfirmation(message);
         break;
       default:
         console.warn('Unknown message type:', message.type);
@@ -340,8 +363,8 @@ class FileTransferManager {
   
   // 处理文件传输完成
   handleFileComplete(message) {
-    const { transferId } = message;
-    console.log('Handling file complete for transfer:', transferId);
+    const { transferId, senderId } = message;
+    console.log('Handling file complete for transfer:', transferId, 'senderId:', senderId);
     
     const receivingFile = this.receivingFiles.get(transferId);
     
@@ -375,6 +398,20 @@ class FileTransferManager {
         size: receivingFile.info.size,
         duration: duration,
         type: 'receive'
+      });
+    }
+    
+    // 如果是中转模式，发送确认消息给发送方
+    const isWebRTCSendMode = this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open';
+    const isCLIMode = !isWebRTCSendMode && this.webrtcManager.ws && this.webrtcManager.ws.readyState === WebSocket.OPEN;
+    
+    if (isCLIMode) {
+      this.sendMessage({
+        type: 'file-received-confirmation',
+        transferId: transferId,
+        fileName: receivingFile.info.name,
+        fileSize: receivingFile.info.size,
+        duration: duration
       });
     }
     
@@ -459,6 +496,33 @@ class FileTransferManager {
   
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // 处理接收方确认消息（中转模式专用）
+  handleFileReceivedConfirmation(message) {
+    const { transferId, fileName, fileSize, duration } = message;
+    console.log('Received confirmation from receiver:', fileName, transferId);
+    
+    // 找到对应的传输记录
+    const transferElement = document.querySelector(`[data-transfer-id="${transferId}"]`);
+    if (transferElement) {
+      const progressText = transferElement.querySelector('.progress-text');
+      if (progressText) {
+        progressText.textContent = `[==========] 100% (${this.formatFileSize(fileSize)} / ${this.formatFileSize(fileSize)}) 接收方已确认`;
+      }
+    }
+    
+    if (this.onTransferComplete) {
+      this.onTransferComplete({
+        transferId: transferId,
+        fileName: fileName,
+        size: fileSize,
+        duration: duration,
+        type: 'send'
+      });
+    }
+    
+    this.log('[中转模式] 接收方已确认收到文件，传输完成', 'success');
   }
   
   // 停止所有正在进行的传输

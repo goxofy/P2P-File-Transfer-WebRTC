@@ -147,6 +147,11 @@ class P2PTransfer extends EventEmitter {
         this.handleFileComplete(data);
         break;
         
+      case 'file-received-confirmation':
+        // 接收方确认消息，通知发送方
+        this.emit('file-received-confirmation', data);
+        break;
+        
       default:
         if (this.verbose) {
           this.log(`未知数据消息: ${data.type}`);
@@ -159,6 +164,7 @@ class P2PTransfer extends EventEmitter {
       await this.connect();
       
       this.transferStopped = false; // 重置传输停止标志
+      this.startTime = Date.now(); // 记录开始时间
       
       // 等待对等端连接
       if (!this.peerConnected) {
@@ -237,10 +243,21 @@ class P2PTransfer extends EventEmitter {
       
       this.log(`文件发送完成: ${fileName}`, 'success');
       
-      // 保持连接一段时间让接收端有时间处理和下载文件
-      this.log('保持连接中，等待接收端处理文件...', 'info');
-      await this.delay(5000); // 等待5秒
-      this.disconnect();
+      // 等待接收方确认
+      this.log('等待接收方确认收到文件...', 'info');
+      
+      // 设置确认等待超时
+      const confirmationTimeout = setTimeout(() => {
+        this.log('等待确认超时，但文件已发送完成', 'warning');
+        this.disconnect();
+      }, 30000); // 30秒超时
+      
+      // 监听确认消息
+      this.once('file-received-confirmation', (data) => {
+        clearTimeout(confirmationTimeout);
+        this.log(`接收方已确认收到文件: ${data.fileName}`, 'success');
+        this.disconnect();
+      });
       
     } catch (error) {
       this.log(`发送文件失败: ${error.message}`, 'error');
@@ -251,6 +268,7 @@ class P2PTransfer extends EventEmitter {
   async startReceiving() {
     try {
       await this.connect();
+      this.startTime = Date.now();
       
       this.log('等待文件传输...');
       
@@ -258,6 +276,16 @@ class P2PTransfer extends EventEmitter {
       return new Promise((resolve, reject) => {
         this.on('file-received', (fileData) => {
           this.log(`文件接收完成: ${fileData.fileName}`, 'success');
+          
+          // 发送确认给发送方
+          this.sendDataMessage({
+            type: 'file-received-confirmation',
+            transferId: fileData.transferId,
+            fileName: fileData.fileName,
+            fileSize: fileData.fileSize,
+            duration: Date.now() - this.startTime
+          });
+          
           resolve(fileData);
         });
         
@@ -326,6 +354,17 @@ class P2PTransfer extends EventEmitter {
     // 保存文件
     const outputPath = path.join(this.outputDir, transfer.info.name);
     fs.writeFileSync(outputPath, fileBuffer);
+    
+    this.log(`文件已保存: ${outputPath}`, 'success');
+    
+    // 发送确认消息给发送方
+    this.sendDataMessage({
+      type: 'file-received-confirmation',
+      transferId: transferId,
+      fileName: transfer.info.name,
+      fileSize: transfer.info.size,
+      duration: Date.now() - this.startTime
+    });
     
     this.emit('file-received', {
       transferId: transferId,

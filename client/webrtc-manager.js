@@ -346,7 +346,9 @@ class WebRTCManager {
         // 如果是缓冲区满的错误，等待后重试
         if (error.name === 'OperationError' && error.message.includes('send queue is full')) {
           console.log('Buffer full, waiting and retrying...');
-          await this.delay(100); // 等待100ms
+          // 根据缓冲区大小动态调整等待时间
+          const waitTime = Math.min(50 + this.dataChannel.bufferedAmount / 1000, 200); // 动态等待50-200ms
+          await this.delay(waitTime);
           try {
             this.dataChannel.send(data);
             return true;
@@ -385,19 +387,22 @@ class WebRTCManager {
     }
   }
 
-  // 等待DataChannel缓冲区清空
+  // 等待DataChannel缓冲区清空（优化性能）
   waitForBufferToClear() {
     return new Promise((resolve) => {
-      if (this.dataChannel.bufferedAmount === 0) {
+      // 只有当缓冲区接近上限时才等待
+      const bufferThreshold = 256 * 1024; // 256KB阈值，放宽限制
+      
+      if (this.dataChannel.bufferedAmount < bufferThreshold) {
         resolve();
         return;
       }
       
       const checkBuffer = () => {
-        if (this.dataChannel.bufferedAmount === 0) {
+        if (this.dataChannel.bufferedAmount < bufferThreshold) {
           resolve();
         } else {
-          setTimeout(checkBuffer, 50);
+          setTimeout(checkBuffer, 10); // 减少检查间隔到10ms
         }
       };
       
