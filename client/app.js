@@ -93,16 +93,20 @@ class WebRTCApp {
       
       if (state === 'connected-cli') {
         this.connectionType = 'cli';
+        this.fileTransfer.setConnectionType('cli');
         this.log('[中转模式] 已连接到CLI客户端，通过信令服务器中转传输', 'info');
         this.showTransferSection();
       } else if (state === 'connected') {
         this.connectionType = 'webrtc';
+        this.fileTransfer.setConnectionType('p2p');
         this.log('[P2P模式] WebRTC数据通道已建立，点对点直接传输', 'success');
       } else if (state === 'connecting') {
         this.connectionType = 'none';
+        this.fileTransfer.setConnectionType('p2p');
         this.log('[连接中] 正在建立连接...', 'info');
       } else if (state === 'disconnected') {
         this.connectionType = 'none';
+        this.fileTransfer.setConnectionType('p2p');
         this.log('[已断开] 连接已断开', 'info');
         // 停止所有正在进行的传输
         this.fileTransfer.stopAllTransfers();
@@ -112,12 +116,14 @@ class WebRTCApp {
         this.updateUI();
       } else {
         this.connectionType = 'none';
+        this.fileTransfer.setConnectionType('p2p');
         this.log(`[状态] ${state}`, 'info');
       }
     };
     
     this.webrtcManager.onDataChannelOpen = () => {
       this.connectionType = 'webrtc';
+      this.fileTransfer.setConnectionType('p2p');
       this.log('[P2P模式] WebRTC数据通道已建立，点对点直接传输', 'success');
       this.showTransferSection();
     };

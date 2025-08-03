@@ -4,6 +4,7 @@ class FileTransferManager {
     this.chunkSize = 16384; // 16KB chunks (safe for most browsers)
     this.activeTransfers = new Map();
     this.receivingFiles = new Map();
+    this.connectionType = 'p2p'; // 默认P2P模式
     
     // 设置 DataChannel 消息处理
     this.webrtcManager.onDataChannelMessage = (data) => {
@@ -147,7 +148,7 @@ class FileTransferManager {
         });
       }
       
-      // 在中转模式下，发送方需要等待接收方确认
+      // 在中转模式下，发送方需要等待接收方确认，不要立即触发完成事件
       this.log('[中转模式] 文件已发送完成，等待接收方确认...', 'info');
     } else {
       // P2P模式下可以立即完成
@@ -231,6 +232,7 @@ class FileTransferManager {
         this.handleFileComplete(message);
         break;
       case 'file-received-confirmation':
+        console.log('Received confirmation message in browser:', message);
         this.handleFileReceivedConfirmation(message);
         break;
       default:
@@ -402,10 +404,8 @@ class FileTransferManager {
     }
     
     // 如果是中转模式，发送确认消息给发送方
-    const isWebRTCSendMode = this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open';
-    const isCLIMode = !isWebRTCSendMode && this.webrtcManager.ws && this.webrtcManager.ws.readyState === WebSocket.OPEN;
-    
-    if (isCLIMode) {
+    if (this.connectionType === 'cli') {
+      console.log('Sending file-received-confirmation in CLI mode:', receivingFile.info.name, transferId);
       this.sendMessage({
         type: 'file-received-confirmation',
         transferId: transferId,
@@ -413,6 +413,8 @@ class FileTransferManager {
         fileSize: receivingFile.info.size,
         duration: duration
       });
+    } else {
+      console.log('Not sending confirmation, connection type is:', this.connectionType);
     }
     
     this.receivingFiles.delete(transferId);
@@ -435,6 +437,12 @@ class FileTransferManager {
     }
     
     return new Blob([combinedBuffer], { type: receivingFile.info.fileType });
+  }
+  
+  // 设置连接类型
+  setConnectionType(type) {
+    this.connectionType = type;
+    console.log('FileTransferManager connection type set to:', type);
   }
   
   // 发送消息（异步）
