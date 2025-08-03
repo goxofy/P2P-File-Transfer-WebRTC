@@ -94,6 +94,8 @@ class P2PTransfer extends EventEmitter {
           });
           this.peerConnected = true;
           this.log(`可以进行文件传输`, 'success');
+          // 触发peer-connected事件，让sendFile可以继续
+          this.emit('peer-connected');
         }
         break;
         
@@ -166,7 +168,7 @@ class P2PTransfer extends EventEmitter {
       this.transferStopped = false; // 重置传输停止标志
       this.startTime = Date.now(); // 记录开始时间
       
-      // 等待对等端连接
+      // 等待对等端连接（包括已存在的对等端）
       if (!this.peerConnected) {
         this.log('等待接收端连接...');
         await new Promise((resolve) => {
