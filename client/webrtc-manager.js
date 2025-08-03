@@ -122,13 +122,24 @@ class WebRTCManager {
           
           console.log(`Found ${webClients.length} web clients and ${cliClients.length} CLI clients`);
           
-          // 只要有CLI客户端存在，就建立WebRTC连接，无论是否有Web客户端
-          // 这样可以确保CLI↔Web的双向通信
-          if (cliClients.length > 0 || webClients.length > 0) {
-            console.log('Setting as WebRTC initiator for cross-platform communication');
+          // 只要有CLI客户端存在，就建立WebRTC连接
+          if (cliClients.length > 0) {
+            console.log('CLI clients detected, establishing WebRTC for CLI↔Web communication');
             this.isInitiator = true;
             await this.initializePeerConnection();
             await this.createOffer();
+          } else if (webClients.length > 0) {
+            // 只有Web客户端，建立WebRTC连接
+            console.log('Web clients detected, establishing WebRTC');
+            this.isInitiator = true;
+            await this.initializePeerConnection();
+            await this.createOffer();
+          } else {
+            // 只有CLI客户端，标记为已连接
+            console.log('CLI clients only, using CLI mode');
+            if (this.onConnectionStateChange) {
+              this.onConnectionStateChange('connected-cli');
+            }
           }
         }
         break;
@@ -136,21 +147,22 @@ class WebRTCManager {
       case 'peer-joined':
         console.log('Peer joined:', message.clientId, 'type:', message.clientType, 'current isInitiator:', this.isInitiator);
         
-        // 无论CLI还是Web客户端加入，都确保建立连接
+        // CLI客户端加入时的处理
         if (message.clientType === 'cli') {
+          console.log('CLI client joined, establishing WebRTC for CLI↔Web communication');
           if (!this.isInitiator && !this.peerConnection) {
-            // CLI客户端加入，Web端作为接收方建立WebRTC连接
-            console.log('CLI client joined, initializing WebRTC for CLI communication');
+            // Web端作为接收方建立WebRTC连接
+            console.log('Web端作为接收方建立WebRTC连接');
             await this.initializePeerConnection();
           } else if (this.isInitiator) {
-            // 如果Web端是发起方，CLI加入后状态变为已连接
-            console.log('CLI client joined, connection established');
+            // Web端已经是发起方，CLI加入后完成连接
+            console.log('CLI加入，完成WebRTC连接');
             if (this.onConnectionStateChange) {
               this.onConnectionStateChange('connected');
             }
           }
         } else if (message.clientType === 'web' && !this.isInitiator && !this.peerConnection) {
-          // Web客户端加入，作为接收方初始化WebRTC连接
+          // 其他Web客户端加入，作为接收方建立WebRTC连接
           console.log('Web client joined, initializing WebRTC as receiver');
           await this.initializePeerConnection();
         }

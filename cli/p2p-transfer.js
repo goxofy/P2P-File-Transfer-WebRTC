@@ -156,9 +156,27 @@ class P2PTransfer extends EventEmitter {
   
   async sendFile(filePath) {
     try {
+      // 设置信号处理
+      this.setupSignalHandlers();
+      
       await this.connect();
       
       this.transferStopped = false; // 重置传输停止标志
+      
+      // 设置超时退出机制（5分钟超时）
+      const timeout = setTimeout(() => {
+        this.log('传输超时，自动退出...', 'error');
+        this.disconnect();
+        process.exit(1);
+      }, 5 * 60 * 1000); // 5分钟
+      
+      // 监听对端断开事件
+      this.once('peer-disconnected', () => {
+        this.log('接收端断开，自动退出...', 'error');
+        clearTimeout(timeout);
+        this.disconnect();
+        process.exit(1);
+      });
       
       // 等待对等端连接
       if (!this.peerConnected) {
@@ -202,13 +220,17 @@ class P2PTransfer extends EventEmitter {
         // 检查传输是否应该停止
         if (this.transferStopped) {
           this.log('传输被中断，停止发送', 'error');
-          return;
+          clearTimeout(timeout);
+          this.disconnect();
+          process.exit(1);
         }
         
         // 检查连接状态
         if (!this.connected || !this.peerConnected) {
           this.log('连接已断开，停止发送', 'error');
-          return;
+          clearTimeout(timeout);
+          this.disconnect();
+          process.exit(1);
         }
         
         const start = i * this.chunkSize;
@@ -236,15 +258,20 @@ class P2PTransfer extends EventEmitter {
       });
       
       this.log(`文件发送完成: ${fileName}`, 'success');
+      clearTimeout(timeout);
       
       // 保持连接一段时间让接收端有时间处理和下载文件
       this.log('保持连接中，等待接收端处理文件...', 'info');
       await this.delay(5000); // 等待5秒
       this.disconnect();
       
+      // 传输完成，自动退出
+      process.exit(0);
+      
     } catch (error) {
       this.log(`发送文件失败: ${error.message}`, 'error');
-      throw error;
+      this.disconnect();
+      process.exit(1);
     }
   }
   
@@ -252,23 +279,46 @@ class P2PTransfer extends EventEmitter {
     try {
       await this.connect();
       
+      // 设置超时退出机制（10分钟超时）
+      const timeout = setTimeout(() => {
+        this.log('等待文件超时，自动退出...', 'error');
+        this.disconnect();
+        process.exit(1);
+      }, 10 * 60 * 1000); // 10分钟
+      
       this.log('等待文件传输...');
       
       // 保持连接，等待文件
       return new Promise((resolve, reject) => {
         this.on('file-received', (fileData) => {
           this.log(`文件接收完成: ${fileData.fileName}`, 'success');
-          resolve(fileData);
+          clearTimeout(timeout);
+          this.disconnect();
+          
+          // 接收完成，自动退出
+          process.exit(0);
         });
         
         this.ws.on('close', () => {
-          reject(new Error('连接意外断开'));
+          clearTimeout(timeout);
+          this.log('连接意外断开，自动退出...', 'error');
+          this.disconnect();
+          process.exit(1);
+        });
+        
+        // 监听传输错误
+        this.on('transfer-error', (error) => {
+          clearTimeout(timeout);
+          this.log(`传输错误: ${error}`, 'error');
+          this.disconnect();
+          process.exit(1);
         });
       });
       
     } catch (error) {
       this.log(`接收文件失败: ${error.message}`, 'error');
-      throw error;
+      this.disconnect();
+      process.exit(1);
     }
   }
   
@@ -365,6 +415,22 @@ class P2PTransfer extends EventEmitter {
   
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  setupSignalHandlers() {
+    // 处理Ctrl+C
+    process.on('SIGINT', () => {
+      this.log('接收到中断信号，正在关闭连接...', 'info');
+      this.disconnect();
+      process.exit(0);
+    });
+    
+    // 处理其他终止信号
+    process.on('SIGTERM', () => {
+      this.log('接收到终止信号，正在关闭连接...', 'info');
+      this.disconnect();
+      process.exit(0);
+    });
   }
 }
 
