@@ -29,7 +29,6 @@ class FileTransferManager {
       fileType: file.type,  // 改名为 fileType 避免冲突
       lastModified: file.lastModified
     };
-    
     this.log('开始文件传输: ' + fileInfo.name + ' (' + this.formatFileSize(fileInfo.size) + ')');
     
     // 如果提供了 UI 元素 ID，立即关联
@@ -219,7 +218,11 @@ class FileTransferManager {
   // 处理已解析的消息
   handleParsedMessage(message) {
     const messageId = message.transferId || message.id || 'no-id';
-    this.log('处理消息: ' + message.type + ' id: ' + messageId);
+    
+    // 只显示重要消息类型，隐藏file-chunk等详细消息
+    if (message.type !== 'file-chunk') {
+      this.log('处理消息: ' + message.type + ' id: ' + messageId);
+    }
     
     switch (message.type) {
       case 'file-info':
@@ -415,11 +418,9 @@ class FileTransferManager {
         duration: duration
       });
     } else {
-      this.log('不发送确认，连接类型为: ' + this.connectionType);
-    }
+      }
     
     this.receivingFiles.delete(transferId);
-    this.log('文件传输完成并清理: ' + transferId);
   }
   
   // 重组文件
