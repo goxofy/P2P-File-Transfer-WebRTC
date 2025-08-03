@@ -203,11 +203,6 @@ class P2PTransfer extends EventEmitter {
         });
       }
       
-      const fullPath = path.resolve(filePath);
-      const fileName = path.basename(fullPath);
-      const stats = fs.statSync(fullPath);
-      const fileSize = stats.size;
-      
       this.log(`开始发送文件: ${fileName} (${this.formatFileSize(fileSize)})`);
       
       const transferId = this.generateTransferId();
