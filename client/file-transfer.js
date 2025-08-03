@@ -149,7 +149,7 @@ class FileTransferManager {
       }
       
       // 在中转模式下，发送方需要等待接收方确认，不要立即触发完成事件
-      this.log('[中转模式] 文件已发送完成，等待接收方确认...', 'info');
+      console.log('[中转模式] 文件已发送完成，等待接收方确认...');
     } else {
       // P2P模式下可以立即完成
       if (this.onTransferComplete) {
