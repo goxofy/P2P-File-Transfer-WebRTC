@@ -10,8 +10,8 @@ class WebRTCManager {
     
     // ICE 服务器配置 (使用免费的 STUN 服务器)
     this.iceServers = [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
+      { urls: 'stun:stun.miwifi.com:3478' },
+      { urls: 'stun:stun.cloudflare.com:3478' }
     ];
     
     // 事件回调
