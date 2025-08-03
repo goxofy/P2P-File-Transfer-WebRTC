@@ -516,7 +516,8 @@ class FileTransferManager {
     if (transferElement) {
       const progressText = transferElement.querySelector('.progress-text');
       if (progressText) {
-        progressText.textContent = `[==========] 100% (${this.formatFileSize(fileSize)} / ${this.formatFileSize(fileSize)}) 接收方已确认`;
+        const formattedSize = this.formatFileSize(fileSize);
+        progressText.textContent = `[==========] 100% (${formattedSize} / ${formattedSize}) 接收方已确认`;
       }
     }
     
@@ -530,7 +531,7 @@ class FileTransferManager {
       });
     }
     
-    this.log('[中转模式] 接收方已确认收到文件，传输完成', 'success');
+    console.log('[中转模式] 接收方已确认收到文件，传输完成');
   }
   
   // 停止所有正在进行的传输
@@ -568,6 +569,15 @@ class FileTransferManager {
     this.receivingFiles.clear();
     
     console.log('All transfers stopped, remaining counts - active:', this.activeTransfers.size, 'receiving:', this.receivingFiles.size);
+  }
+  
+  // 格式化文件大小
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
   
   // 获取传输统计
