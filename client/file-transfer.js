@@ -16,6 +16,7 @@ class FileTransferManager {
     this.onTransferProgress = null;
     this.onTransferComplete = null;
     this.onTransferError = null;
+    this.onLog = null; // 日志回调
   }
   
   // 发送文件
@@ -29,7 +30,7 @@ class FileTransferManager {
       lastModified: file.lastModified
     };
     
-    console.log('Starting file transfer:', fileInfo);
+    this.log('开始文件传输: ' + fileInfo.name + ' (' + this.formatFileSize(fileInfo.size) + ')');
     
     // 如果提供了 UI 元素 ID，立即关联
     if (uiItemId) {
@@ -45,7 +46,7 @@ class FileTransferManager {
       type: 'file-info',
       ...fileInfo
     };
-    console.log('Sending file-info message:', fileInfoMessage);
+    this.log('发送文件信息: ' + fileInfo.name);
     await this.sendMessage(fileInfoMessage);
     
     // 给接收端一些时间处理 file-info 消息
@@ -149,7 +150,7 @@ class FileTransferManager {
       }
       
       // 在中转模式下，发送方需要等待接收方确认，不要立即触发完成事件
-      console.log('[中转模式] 文件已发送完成，等待接收方确认...');
+      this.log('[中转模式] 文件已发送完成，等待接收方确认...');
     } else {
       // P2P模式下可以立即完成
       if (this.onTransferComplete) {
@@ -218,11 +219,11 @@ class FileTransferManager {
   // 处理已解析的消息
   handleParsedMessage(message) {
     const messageId = message.transferId || message.id || 'no-id';
-    console.log('Handling message:', message.type, 'id:', messageId);
+    this.log('处理消息: ' + message.type + ' id: ' + messageId);
     
     switch (message.type) {
       case 'file-info':
-        console.log('Processing file-info message:', message);
+        this.log('处理文件信息: ' + message.name + ' ' + this.formatFileSize(message.size) + ', transferId: ' + message.id);
         this.handleFileInfo(message);
         break;
       case 'file-chunk':
@@ -232,11 +233,11 @@ class FileTransferManager {
         this.handleFileComplete(message);
         break;
       case 'file-received-confirmation':
-        console.log('Received confirmation message in browser:', message);
+        this.log('收到确认消息: ' + message.fileName);
         this.handleFileReceivedConfirmation(message);
         break;
       default:
-        console.warn('Unknown message type:', message.type);
+        this.log('未知消息类型: ' + message.type);
     }
   }
   
@@ -414,11 +415,11 @@ class FileTransferManager {
         duration: duration
       });
     } else {
-      console.log('Not sending confirmation, connection type is:', this.connectionType);
+      this.log('不发送确认，连接类型为: ' + this.connectionType);
     }
     
     this.receivingFiles.delete(transferId);
-    console.log('File transfer completed and cleaned up:', transferId);
+    this.log('文件传输完成并清理: ' + transferId);
   }
   
   // 重组文件
@@ -442,7 +443,16 @@ class FileTransferManager {
   // 设置连接类型
   setConnectionType(type) {
     this.connectionType = type;
-    console.log('FileTransferManager connection type set to:', type);
+    this.log('连接类型设置为: ' + type);
+  }
+
+  // 日志方法
+  log(message) {
+    if (this.onLog) {
+      this.onLog(message);
+    } else {
+      console.log(message);
+    }
   }
   
   // 发送消息（异步）
@@ -531,7 +541,7 @@ class FileTransferManager {
       });
     }
     
-    console.log('[中转模式] 接收方已确认收到文件，传输完成');
+    this.log('[中转模式] 接收方已确认收到文件，传输完成');
   }
   
   // 停止所有正在进行的传输

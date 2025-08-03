@@ -147,6 +147,11 @@ class WebRTCApp {
   }
   
   setupFileTransferCallbacks() {
+    // 设置文件传输日志回调
+    this.fileTransfer.onLog = (message) => {
+      this.log(message, 'info');
+    };
+    
     this.fileTransfer.onTransferProgress = (progress) => {
       // 如果是接收端且是新的传输，创建传输项目
       if (progress.type === 'receive' && progress.progress === 0) {
