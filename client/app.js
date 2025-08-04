@@ -278,18 +278,15 @@ class WebRTCApp {
     }
     
     for (const file of files) {
-      console.log('Processing file:', file.name);
       this.log(`开始发送: ${file.name} (${this.formatFileSize(file.size)})`, 'info');
       
       // 创建传输项目
       const itemId = this.addTransferItem(file.name, file.size, 'send');
       
       try {
-        // 发送文件，传递 itemId 以便在内部关联
         await this.fileTransfer.sendFile(file, itemId);
       } catch (error) {
         this.log(`发送文件失败: ${error.message}`, 'error');
-        console.error('File send error:', error);
       }
     }
     
@@ -327,9 +324,13 @@ class WebRTCApp {
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    
+    // 清理URL对象
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   }
   
   addTransferItem(fileName, fileSize, type) {
