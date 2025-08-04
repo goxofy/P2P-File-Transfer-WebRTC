@@ -94,7 +94,16 @@ class WebRTCApp {
       if (state === 'connected-cli') {
         this.connectionType = 'cli';
         this.fileTransfer.setConnectionType('cli');
-        this.log('[中转模式] 已连接到CLI客户端，通过信令服务器中转传输', 'info');
+        
+        // 检查房间中的客户端类型，提供准确的描述
+        this.checkRoomComposition().then(roomInfo => {
+          if (roomInfo.hasCLI) {
+            this.log('[中转模式] 已连接到CLI客户端，通过信令服务器中转传输', 'info');
+          } else {
+            this.log('[中转模式] P2P连接失败，通过信令服务器中转传输 (Web↔Web)', 'info');
+          }
+        });
+        
         this.showTransferSection();
       } else if (state === 'connected') {
         this.connectionType = 'webrtc';
@@ -103,12 +112,23 @@ class WebRTCApp {
       } else if (state === 'fallback-to-relay') {
         this.connectionType = 'cli';
         this.fileTransfer.setConnectionType('cli');
-        this.log('[回退成功] P2P连接失败，已自动回退到中转模式', 'warning');
+        
+        // 回退时检查房间组成
+        this.checkRoomComposition().then(roomInfo => {
+          if (roomInfo.hasCLI) {
+            this.log('[回退成功] P2P连接失败，已自动回退到中转模式 (Web↔CLI)', 'warning');
+          } else {
+            this.log('[回退成功] P2P连接失败，已自动回退到中转模式 (Web↔Web)', 'warning');
+          }
+        });
+        
         this.showTransferSection();
       } else if (state === 'connecting') {
         this.connectionType = 'none';
         this.fileTransfer.setConnectionType('p2p');
         this.log('[连接中] 正在建立连接...', 'info');
+        // 连接中不显示传输区域
+        document.getElementById('transfer-section').style.display = 'none';
       } else if (state === 'disconnected') {
         this.connectionType = 'none';
         this.fileTransfer.setConnectionType('p2p');
@@ -240,6 +260,9 @@ class WebRTCApp {
     this.connectionType = 'none';
     this.updateConnectionStatus('disconnected');
     this.updateUI();
+    
+    // 初始状态隐藏传输区域
+    document.getElementById('transfer-section').style.display = 'none';
     this.log('[已断开] 连接已断开', 'info');
   }
   
@@ -440,26 +463,69 @@ class WebRTCApp {
   }
   
   showTransferSection() {
-    document.getElementById('transfer-section').style.display = 'block';
-    
-    // 更新文件传输区域的状态提示
-    const dropZone = document.getElementById('file-drop-zone');
-    const dropContent = dropZone.querySelector('.drop-content p');
-    
-    if (this.connectionType === 'webrtc') {
-      dropContent.textContent = '[P2P模式] WebRTC数据通道已建立，可以开始文件传输';
-    } else if (this.connectionType === 'cli') {
-      dropContent.textContent = '[中转模式] CLI客户端已连接，通过服务器中转传输';
-    } else {
-      dropContent.textContent = '连接已建立，可以拖拽文件到这里或点击选择文件';
+    // 只有在连接建立后才显示传输区域
+    if (this.connectionType === 'webrtc' || this.connectionType === 'cli') {
+      document.getElementById('transfer-section').style.display = 'block';
+      
+      // 更新文件传输区域的状态提示
+      const dropZone = document.getElementById('file-drop-zone');
+      const dropContent = dropZone.querySelector('.drop-content p');
+      
+      if (this.connectionType === 'webrtc') {
+        dropContent.textContent = '[P2P模式] WebRTC数据通道已建立，可以开始文件传输';
+      } else if (this.connectionType === 'cli') {
+        dropContent.textContent = '[中转模式] CLI客户端已连接，通过服务器中转传输';
+      }
+      
+      dropZone.style.borderColor = '#27ae60';
+      dropZone.style.backgroundColor = '#f0fff4';
     }
-    
-    dropZone.style.borderColor = '#27ae60';
-    dropZone.style.backgroundColor = '#f0fff4';
   }
   
   generateRoomId() {
     return Math.random().toString(36).substr(2, 8).toUpperCase();
+  }
+  
+  // 检查房间中的客户端组成
+  async checkRoomComposition() {
+    return new Promise((resolve) => {
+      // 通过向服务器查询房间信息
+      if (this.webrtcManager.ws && this.webrtcManager.ws.readyState === WebSocket.OPEN) {
+        // 发送查询请求
+        this.webrtcManager.sendSignalingMessage({
+          type: 'room-info',
+          roomId: document.getElementById('room-id').value.trim()
+        });
+        
+        // 设置超时处理
+        const timeout = setTimeout(() => {
+          resolve({ hasCLI: false });
+        }, 2000);
+        
+        // 临时监听响应
+        const handleRoomInfo = (message) => {
+          if (message.type === 'room-info-response') {
+            clearTimeout(timeout);
+            const hasCLI = message.members.some(member => member.clientType === 'cli');
+            resolve({ hasCLI });
+          }
+        };
+        
+        this.webrtcManager.ws.addEventListener('message', (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            if (message.type === 'room-info-response') {
+              handleRoomInfo(message);
+            }
+          } catch (e) {
+            console.error('Error parsing room info response:', e);
+          }
+        }, { once: true });
+      } else {
+        // 如果无法查询，默认认为可能有CLI
+        resolve({ hasCLI: true });
+      }
+    });
   }
   
   formatFileSize(bytes) {
