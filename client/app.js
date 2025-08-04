@@ -109,11 +109,10 @@ class WebRTCApp {
         
         this.showTransferSection();
       } else if (state === 'connecting') {
-        this.connectionType = 'none';
+        this.connectionType = 'connecting';
         this.fileTransfer.setConnectionType('p2p');
         this.log('[连接中] 正在建立连接...', 'info');
-        // 连接中不显示传输区域
-        document.getElementById('transfer-section').style.display = 'none';
+        // 连接中显示传输区域但隐藏按钮
       } else if (state === 'disconnected') {
         this.connectionType = 'none';
         this.fileTransfer.setConnectionType('p2p');
@@ -441,19 +440,20 @@ class WebRTCApp {
       disconnectBtn.style.display = 'inline-block';
       transferSection.style.display = 'block';
       
+      // 所有模式都使用统一的P2P样式
       if (this.connectionType === 'cli') {
-        // CLI模式 - 直接显示
+        // CLI模式
         const dropContent = dropZone.querySelector('.drop-content p');
         dropContent.textContent = '[中转模式] 已连接，可以开始文件传输';
         dropZone.style.borderColor = '#27ae60';
-        dropZone.style.backgroundColor = '#ffffff';
+        dropZone.style.backgroundColor = '#f0fff4';
         selectFileBtn.style.display = 'inline-block';
-      } else if (this.connectionType === 'p2p' && !this.webrtcManager.dataChannel) {
-        // WebRTC模式 - 正在建立连接
+      } else if (this.connectionType === 'connecting' || (this.connectionType === 'p2p' && !this.webrtcManager.dataChannel)) {
+        // 连接中状态
         const dropContent = dropZone.querySelector('.drop-content p');
         dropContent.textContent = '[连接中] 正在建立数据通道...';
-        dropZone.style.borderColor = '#f39c12';
-        dropZone.style.backgroundColor = '#fefcf3';
+        dropZone.style.borderColor = '#27ae60';
+        dropZone.style.backgroundColor = '#f0fff4';
         selectFileBtn.style.display = 'none'; // 隐藏Select Files按钮
       } else if (this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open') {
         // WebRTC模式 - 已建立连接
@@ -466,8 +466,8 @@ class WebRTCApp {
         // WebRTC模式 - 等待连接
         const dropContent = dropZone.querySelector('.drop-content p');
         dropContent.textContent = '等待另一个用户连接以建立数据通道...';
-        dropZone.style.borderColor = '#f39c12';
-        dropZone.style.backgroundColor = '#fefcf3';
+        dropZone.style.borderColor = '#27ae60';
+        dropZone.style.backgroundColor = '#f0fff4';
         selectFileBtn.style.display = 'none'; // 隐藏Select Files按钮
       }
     } else {
