@@ -15,7 +15,7 @@ jobs:
             target: node18-linux-x64
             output: p2p-transfer-linux-x64
           - runner: ubuntu-latest
-            target: node18-linux-x86
+            target: node16-linux-x86
             output: p2p-transfer-linux-x86
           - runner: ubuntu-latest
             target: node18-linux-arm64
@@ -30,7 +30,7 @@ jobs:
             target: node18-win-x64
             output: p2p-transfer-windows-x64.exe
           - runner: windows-latest
-            target: node18-win-x86
+            target: node16-win-x86
             output: p2p-transfer-windows-x86.exe
     
     runs-on: ${{ matrix.runner }}
@@ -55,17 +55,23 @@ jobs:
     - name: Install pkg globally
       run: npm install -g pkg
       
-    - name: Build binary
-      run: |
-        mkdir -p dist
-        pkg cli/index.js --targets ${{ matrix.target }} --out-path dist --compress GZip
-        
     - name: Install system dependencies for 32-bit build (Linux x86)
-      if: matrix.target == 'node18-linux-x86'
+      if: matrix.target == 'node16-linux-x86'
       run: |
         sudo dpkg --add-architecture i386
         sudo apt-get update
         sudo apt-get install -y libc6-dev:i386 libstdc++6:i386 gcc-multilib g++-multilib
+        
+    - name: Install NASM for Windows 32-bit build
+      if: runner.os == 'Windows' && matrix.target == 'node16-win-x86'
+      run: |
+        choco install nasm
+        refreshenv
+        
+    - name: Build binary
+      run: |
+        mkdir -p dist
+        pkg cli/index.js --targets ${{ matrix.target }} --out-path dist --compress GZip
         
     - name: Rename binary (Linux/macOS)
       if: runner.os != 'Windows'

@@ -12,7 +12,7 @@
     "serve": "http-server client -p 8080 -c-1",
     "dev:full": "concurrently \"npm run dev\" \"npm run serve\"",
     "build": "pkg cli/index.js --config pkg.json --out-path dist",
-    "build:all": "pkg cli/index.js --targets node18-linux-x64,node18-linux-x86,node18-linux-arm64,node18-macos-x64,node18-macos-arm64,node18-win-x64,node18-win-x86 --out-path dist"
+    "build:all": "pkg cli/index.js --targets node18-linux-x64,node16-linux-x86,node18-linux-arm64,node18-macos-x64,node18-macos-arm64,node18-win-x64,node16-win-x86 --out-path dist"
   },
   "keywords": [
     "webrtc",
