@@ -411,38 +411,57 @@ function handleLeave(ws) {
     }
   });
   
-  // 通知所有客户端传输中断并强制断开
-  room.forEach(otherWs => {
-    if (otherWs.readyState === WebSocket.OPEN) {
-      otherWs.send(JSON.stringify({
-        type: 'transfer-interrupted',
-        message: '传输已中断，房间将被清理',
-        reason: 'peer-disconnected'
-      }));
-      // 强制关闭其他客户端连接
-      setTimeout(() => {
-        if (otherWs.readyState === WebSocket.OPEN) {
-          otherWs.close(1000, 'Room force closed due to transfer interruption');
-        }
-      }, 1000);
-    }
-  });
-  
   // 清理所有传输
   transfersToStop.forEach(({transferId}) => {
     activeTransfers.delete(transferId);
   });
   
-  // 强制清理整个房间
-  room.forEach(roomClient => {
-    if (roomClient !== ws && roomClient.readyState === WebSocket.OPEN) {
-      roomClient.terminate();
+  // 检查是否有活跃传输
+  if (transfersToStop.length > 0) {
+    // 有活跃传输时，通知传输中断
+    room.forEach(otherWs => {
+      if (otherWs.readyState === WebSocket.OPEN) {
+        otherWs.send(JSON.stringify({
+          type: 'transfer-interrupted',
+          message: '传输已中断，请重新连接',
+          reason: 'peer-disconnected'
+        }));
+      }
+    });
+    
+    // 延迟1秒后清理房间（给客户端时间处理消息）
+    setTimeout(() => {
+      room.forEach(otherWs => {
+        if (otherWs.readyState === WebSocket.OPEN) {
+          otherWs.close(1000, 'Transfer interrupted');
+        }
+      });
+      
+      // 清理房间
+      room.forEach(roomClient => {
+        clients.delete(roomClient);
+      });
+      rooms.delete(roomId);
+    }, 1000);
+  } else {
+    // 无活跃传输时，使用正常清理
+    room.delete(ws);
+    
+    // 通知其他客户端
+    room.forEach(otherWs => {
+      if (otherWs.readyState === WebSocket.OPEN) {
+        otherWs.send(JSON.stringify({
+          type: 'peer-left',
+          clientId: clientId
+        }));
+      }
+    });
+    
+    // 清理空房间
+    if (room.size === 0) {
+      rooms.delete(roomId);
     }
-    clients.delete(roomClient);
-  });
-  
-  // 删除房间
-  rooms.delete(roomId);
+  }
   
   // 清理当前客户端
   clients.delete(ws);
