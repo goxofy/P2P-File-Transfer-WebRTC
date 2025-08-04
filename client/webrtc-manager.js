@@ -320,17 +320,13 @@ class WebRTCManager {
   
   // 处理 DataChannel 消息
   handleDataChannelMessage(data) {
-    
     if (this.onDataChannelMessage) {
       this.onDataChannelMessage(data);
     }
-    }
   }
   
-  // 发送数据通过 DataChannel
   // 发送数据 (支持WebRTC和CLI模式)，带队列控制和重试机制
   async sendData(data) {
-    
     // 如果有WebRTC连接，优先使用WebRTC
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
       try {
