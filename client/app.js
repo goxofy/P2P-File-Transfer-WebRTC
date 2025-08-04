@@ -244,8 +244,6 @@ class WebRTCApp {
       this.webrtcManager.joinRoom(document.getElementById('room-id').value);
       
       this.isConnected = true;
-      // 初始状态：隐藏传输区域，直到实际连接建立
-      document.getElementById('transfer-section').style.display = 'none';
       this.updateUI();
       this.log(`[已连接] 已连接到信令服务器，房间: ${document.getElementById('room-id').value}`, 'success');
     } catch (error) {
@@ -446,7 +444,7 @@ class WebRTCApp {
     // 清理不再使用
   }
   
-  updateUI(roomInfo = null) {
+  updateUI() {
     const connectBtn = document.getElementById('connect-btn');
     const disconnectBtn = document.getElementById('disconnect-btn');
     const transferSection = document.getElementById('transfer-section');
@@ -456,22 +454,27 @@ class WebRTCApp {
       connectBtn.style.display = 'none';
       disconnectBtn.style.display = 'inline-block';
       
-      // 默认隐藏传输区域，除非有实际连接
-      transferSection.style.display = 'none';
+      // 显示传输区域，根据连接状态显示不同提示
+      transferSection.style.display = 'block';
       
-      // 如果有实际连接，显示相应状态
-      if (this.connectionType === 'webrtc' && this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open') {
-        transferSection.style.display = 'block';
+      if (this.connectionType === 'cli') {
+        // CLI模式 - 直接显示
+        const dropContent = dropZone.querySelector('.drop-content p');
+        dropContent.textContent = '[中转模式] 已连接，可以开始文件传输';
+        dropZone.style.borderColor = '#27ae60';
+        dropZone.style.backgroundColor = '#ffffff';
+      } else if (this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open') {
+        // WebRTC模式 - 已建立连接
         const dropContent = dropZone.querySelector('.drop-content p');
         dropContent.textContent = '[P2P模式] WebRTC数据通道已建立，可以开始文件传输';
         dropZone.style.borderColor = '#27ae60';
         dropZone.style.backgroundColor = '#f0fff4';
-      } else if (this.connectionType === 'cli') {
-        transferSection.style.display = 'block';
+      } else {
+        // WebRTC模式 - 等待连接
         const dropContent = dropZone.querySelector('.drop-content p');
-        dropContent.textContent = '[中转模式] CLI客户端已连接，通过服务器中转传输';
-        dropZone.style.borderColor = '#27ae60';
-        dropZone.style.backgroundColor = '#ffffff';
+        dropContent.textContent = '等待另一个用户连接以建立数据通道...';
+        dropZone.style.borderColor = '#f39c12';
+        dropZone.style.backgroundColor = '#fefcf3';
       }
     } else {
       connectBtn.style.display = 'inline-block';
