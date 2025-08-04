@@ -130,6 +130,8 @@ class FileTransferManager {
     
     // 中转模式需要等待接收方确认
     if (this.connectionType === 'cli') {
+      this.log(`正在等待接收端确认收到: ${fileInfo.name}`);
+      
       if (this.onTransferProgress) {
         this.onTransferProgress({
           transferId: transferId,

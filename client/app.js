@@ -401,16 +401,20 @@ class WebRTCApp {
         found = true;
         const progressText = item.querySelector('.progress-text');
         
-        const percentage = Math.round(progress.progress);
-        const current = progress.type === 'send' ? progress.sent : progress.received;
-        
-        // 创建ASCII进度条 (10个字符宽度)
-        const barWidth = 10;
-        const filledWidth = Math.round((percentage / 100) * barWidth);
-        const emptyWidth = barWidth - filledWidth;
-        const progressBar = '='.repeat(filledWidth) + ' '.repeat(emptyWidth);
-        
-        progressText.textContent = `[${progressBar}] ${percentage}% (${this.formatFileSize(current)} / ${this.formatFileSize(progress.total)})`;
+        if (progress.status === 'waiting-confirmation') {
+          progressText.textContent = `[==========] 100% (${this.formatFileSize(progress.total)} / ${this.formatFileSize(progress.total)}) 等待接收端确认收到...`;
+        } else {
+          const percentage = Math.round(progress.progress);
+          const current = progress.type === 'send' ? progress.sent : progress.received;
+          
+          // 创建ASCII进度条 (10个字符宽度)
+          const barWidth = 10;
+          const filledWidth = Math.round((percentage / 100) * barWidth);
+          const emptyWidth = barWidth - filledWidth;
+          const progressBar = '='.repeat(filledWidth) + ' '.repeat(emptyWidth);
+          
+          progressText.textContent = `[${progressBar}] ${percentage}% (${this.formatFileSize(current)} / ${this.formatFileSize(progress.total)})`;
+        }
         
         return;
       }
