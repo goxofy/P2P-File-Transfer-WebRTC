@@ -451,7 +451,7 @@ class WebRTCApp {
       } else if (this.connectionType === 'connecting' || (this.connectionType === 'p2p' && !this.webrtcManager.dataChannel)) {
         // 连接中状态
         const dropContent = dropZone.querySelector('.drop-content p');
-        dropContent.textContent = '[连接中] 正在建立数据通道...';
+        dropContent.textContent = '[连接中] 正在尝试建立P2P连接...';
         dropZone.style.borderColor = '#27ae60';
         dropZone.style.backgroundColor = '#f0fff4';
         selectFileBtn.style.display = 'none'; // 隐藏Select Files按钮
