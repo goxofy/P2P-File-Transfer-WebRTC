@@ -448,6 +448,13 @@ class WebRTCApp {
         dropZone.style.borderColor = '#27ae60';
         dropZone.style.backgroundColor = '#ffffff';
         selectFileBtn.style.display = 'inline-block';
+      } else if (this.connectionType === 'p2p' && !this.webrtcManager.dataChannel) {
+        // WebRTC模式 - 正在建立连接
+        const dropContent = dropZone.querySelector('.drop-content p');
+        dropContent.textContent = '[连接中] 正在建立数据通道...';
+        dropZone.style.borderColor = '#f39c12';
+        dropZone.style.backgroundColor = '#fefcf3';
+        selectFileBtn.style.display = 'none'; // 隐藏Select Files按钮
       } else if (this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open') {
         // WebRTC模式 - 已建立连接
         const dropContent = dropZone.querySelector('.drop-content p');
