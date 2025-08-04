@@ -190,6 +190,25 @@ function handleJoinRoom(ws, data) {
         clientId: clientId,
         clientType: 'cli'
       }));
+      
+      // 同时发送房间人数更新给现有成员
+      const members = Array.from(room)
+        .filter(c => c.readyState === WebSocket.OPEN && c !== client)
+        .map(c => {
+          const clientInfo = clients.get(c);
+          return clientInfo ? {
+            clientId: clientInfo.clientId,
+            clientType: clientInfo.mode || 'unknown'
+          } : null;
+        })
+        .filter(Boolean);
+        
+      client.send(JSON.stringify({
+        type: 'room-info-response',
+        roomId: roomId,
+        members: members,
+        memberCount: members.length + 1
+      }));
     }
   });
   
@@ -208,6 +227,25 @@ function handleJoinRoom(ws, data) {
     clientId: clientId,
     memberCount: room.size,
     existingMembers: existingMembers
+  }));
+  
+  // 同时发送房间人数更新给新CLI成员
+  const allMembers = Array.from(room)
+    .filter(client => client.readyState === WebSocket.OPEN)
+    .map(client => {
+      const clientInfo = clients.get(client);
+      return clientInfo ? {
+        clientId: clientInfo.clientId,
+        clientType: clientInfo.mode || 'unknown'
+      } : null;
+    })
+    .filter(Boolean);
+    
+  ws.send(JSON.stringify({
+    type: 'room-info-response',
+    roomId: roomId,
+    members: allMembers,
+    memberCount: allMembers.length
   }));
 }
 
@@ -355,6 +393,25 @@ function handleJoin(ws, data) {
         clientId: clientId,
         clientType: 'web'
       }));
+      
+      // 同时发送房间人数更新给现有成员
+      const members = Array.from(room)
+        .filter(c => c.readyState === WebSocket.OPEN && c !== client)
+        .map(c => {
+          const clientInfo = clients.get(c);
+          return clientInfo ? {
+            clientId: clientInfo.clientId,
+            clientType: clientInfo.mode || 'unknown'
+          } : null;
+        })
+        .filter(Boolean);
+        
+      client.send(JSON.stringify({
+        type: 'room-info-response',
+        roomId: roomId,
+        members: members,
+        memberCount: members.length + 1 // 包括新成员
+      }));
     }
   });
   
@@ -371,6 +428,25 @@ function handleJoin(ws, data) {
     type: 'room-joined',
     roomId: roomId,
     existingMembers: existingMembers
+  }));
+  
+  // 同时发送房间人数更新给新成员
+  const allMembers = Array.from(room)
+    .filter(client => client.readyState === WebSocket.OPEN)
+    .map(client => {
+      const clientInfo = clients.get(client);
+      return clientInfo ? {
+        clientId: clientInfo.clientId,
+        clientType: clientInfo.mode || 'unknown'
+      } : null;
+    })
+    .filter(Boolean);
+    
+  ws.send(JSON.stringify({
+    type: 'room-info-response',
+    roomId: roomId,
+    members: allMembers,
+    memberCount: allMembers.length
   }));
 }
 
@@ -447,12 +523,31 @@ function handleLeave(ws) {
     // 无活跃传输时，使用正常清理
     room.delete(ws);
     
-    // 通知其他客户端
+    // 通知其他客户端有人离开
     room.forEach(otherWs => {
       if (otherWs.readyState === WebSocket.OPEN) {
         otherWs.send(JSON.stringify({
           type: 'peer-left',
           clientId: clientId
+        }));
+        
+        // 同时发送房间人数更新
+        const members = Array.from(room)
+          .filter(client => client.readyState === WebSocket.OPEN && client !== ws)
+          .map(client => {
+            const clientInfo = clients.get(client);
+            return clientInfo ? {
+              clientId: clientInfo.clientId,
+              clientType: clientInfo.mode || 'unknown'
+            } : null;
+          })
+          .filter(Boolean);
+          
+        otherWs.send(JSON.stringify({
+          type: 'room-info-response',
+          roomId: roomId,
+          members: members,
+          memberCount: members.length
         }));
       }
     });
