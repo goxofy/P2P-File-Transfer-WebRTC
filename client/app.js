@@ -128,6 +128,7 @@ class WebRTCApp {
         this.fileTransfer.setConnectionType('p2p');
         this.log(`[状态] ${state}`, 'info');
       }
+      
     };
     
     this.webrtcManager.onDataChannelOpen = () => {
@@ -407,17 +408,6 @@ class WebRTCApp {
     }
   }
 
-  // 更新房间状态（仅在需要时检查）
-  async updateRoomStatus() {
-    if (!this.isConnected) return;
-    
-    try {
-      const roomInfo = await this.checkRoomComposition();
-      this.updateUI(roomInfo);
-    } catch (error) {
-      console.error('房间状态检查失败:', error);
-    }
-  }
 
   // 移除定时器，改为事件驱动
   startRoomStatusCheck() {
@@ -448,8 +438,8 @@ class WebRTCApp {
         dropZone.style.borderColor = '#27ae60';
         dropZone.style.backgroundColor = '#f0fff4';
         selectFileBtn.style.display = 'inline-block';
-      } else if (this.connectionType === 'connecting' || (this.connectionType === 'p2p' && !this.webrtcManager.dataChannel)) {
-        // 连接中状态
+      } else if (this.connectionType === 'connecting') {
+        // 连接中状态 - 只在两个web用户建立P2P时显示
         const dropContent = dropZone.querySelector('.drop-content p');
         dropContent.textContent = '[连接中] 正在尝试建立P2P连接...';
         dropZone.style.borderColor = '#27ae60';
@@ -465,7 +455,7 @@ class WebRTCApp {
       } else {
         // WebRTC模式 - 等待连接
         const dropContent = dropZone.querySelector('.drop-content p');
-        dropContent.textContent = '[连接中] 正在尝试建立P2P连接...';
+        dropContent.textContent = '等待另一个用户连接以建立数据通道...';
         dropZone.style.borderColor = '#27ae60';
         dropZone.style.backgroundColor = '#f0fff4';
         selectFileBtn.style.display = 'none'; // 隐藏Select Files按钮
