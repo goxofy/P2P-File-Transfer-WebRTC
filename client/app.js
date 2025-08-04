@@ -244,8 +244,9 @@ class WebRTCApp {
       this.webrtcManager.joinRoom(document.getElementById('room-id').value);
       
       this.isConnected = true;
+      // 初始状态：隐藏传输区域，直到实际连接建立
+      document.getElementById('transfer-section').style.display = 'none';
       this.updateUI();
-      this.startRoomStatusCheck();
       this.log(`[已连接] 已连接到信令服务器，房间: ${document.getElementById('room-id').value}`, 'success');
     } catch (error) {
       this.log(`[连接失败] ${error.message}`, 'error');
@@ -261,7 +262,6 @@ class WebRTCApp {
     this.connectionType = 'none';
     this.updateConnectionStatus('disconnected');
     this.updateUI();
-    this.stopRoomStatusCheck();
     
     // 初始状态隐藏传输区域
     document.getElementById('transfer-section').style.display = 'none';
@@ -278,29 +278,13 @@ class WebRTCApp {
       return;
     }
     
-    // 检查房间中是否有其他客户端
-    try {
-      const roomInfo = await this.checkRoomComposition();
-      const hasOtherPeer = roomInfo.members && roomInfo.members.length > 1;
-      
-      if (!hasOtherPeer) {
-        this.log('没有可用的连接，无法发送文件。请等待另一个用户加入房间。', 'error');
-        alert('没有可用的连接！请等待另一个用户加入房间。');
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking room composition:', error);
-      this.log('检查房间状态时出错，请稍后重试', 'error');
-      return;
-    }
-    
     // 检查连接状态 - 支持WebRTC和CLI模式
     const hasConnection = (this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open') ||
                          (this.connectionType === 'cli');
     
     if (!hasConnection) {
-      this.log('连接尚未建立，无法发送文件。请等待对方确认连接。', 'error');
-      alert('连接尚未建立！请等待对方确认连接。');
+      this.log('没有可用的连接，无法发送文件。请确保另一个用户已连接到相同房间。', 'error');
+      alert('没有可用的连接！请确保另一个用户已连接到相同房间。');
       return;
     }
     
@@ -441,29 +425,28 @@ class WebRTCApp {
     }
   }
 
-  // 定期更新房间状态
-  startRoomStatusCheck() {
-    if (this.roomStatusInterval) {
-      clearInterval(this.roomStatusInterval);
-    }
+  // 更新房间状态（仅在需要时检查）
+  async updateRoomStatus() {
+    if (!this.isConnected) return;
     
-    this.roomStatusInterval = setInterval(() => {
-      if (this.isConnected) {
-        this.checkRoomComposition().then(() => {
-          this.updateUI();
-        });
-      }
-    }, 2000); // 每2秒检查一次房间状态
+    try {
+      const roomInfo = await this.checkRoomComposition();
+      this.updateUI(roomInfo);
+    } catch (error) {
+      console.error('房间状态检查失败:', error);
+    }
+  }
+
+  // 移除定时器，改为事件驱动
+  startRoomStatusCheck() {
+    // 不再使用定时器，改为事件驱动更新
   }
 
   stopRoomStatusCheck() {
-    if (this.roomStatusInterval) {
-      clearInterval(this.roomStatusInterval);
-      this.roomStatusInterval = null;
-    }
+    // 清理不再使用
   }
   
-  updateUI() {
+  updateUI(roomInfo = null) {
     const connectBtn = document.getElementById('connect-btn');
     const disconnectBtn = document.getElementById('disconnect-btn');
     const transferSection = document.getElementById('transfer-section');
@@ -473,45 +456,23 @@ class WebRTCApp {
       connectBtn.style.display = 'none';
       disconnectBtn.style.display = 'inline-block';
       
-      // 检查房间中是否有其他客户端
-      this.checkRoomComposition().then(roomInfo => {
-        const hasOtherPeer = roomInfo.members && roomInfo.members.length > 1;
-        
-        if (!hasOtherPeer) {
-          // 没有其他客户端在房间中
-          transferSection.style.display = 'block';
-          const dropContent = dropZone.querySelector('.drop-content p');
-          dropContent.textContent = '等待另一个用户加入房间...';
-          dropZone.style.borderColor = '#f39c12';
-          dropZone.style.backgroundColor = '#fefcf3';
-          return;
-        }
-        
-        // 有客户端在房间中
-        if (this.connectionType === 'cli') {
-          // CLI模式 - 不需要等待DataChannel
-          transferSection.style.display = 'block';
-          const dropContent = dropZone.querySelector('.drop-content p');
-          if (roomInfo.hasCLI) {
-            dropContent.textContent = '[中转模式] CLI客户端已连接，通过服务器中转传输 (Web↔CLI)';
-          } else {
-            dropContent.textContent = '[中转模式] 通过服务器中转传输 (Web↔Web)';
-          }
-          dropZone.style.borderColor = '#27ae60';
-          dropZone.style.backgroundColor = '#ffffff';
-        } else if (!this.webrtcManager.dataChannel || this.webrtcManager.dataChannel.readyState !== 'open') {
-          // WebRTC模式 - 等待DataChannel建立
-          transferSection.style.display = 'block';
-          const dropContent = dropZone.querySelector('.drop-content p');
-          if (roomInfo.hasCLI) {
-            dropContent.textContent = '[中转模式] 等待CLI客户端确认传输 (Web↔CLI)';
-          } else {
-            dropContent.textContent = '[P2P模式] 等待另一个用户连接以建立数据通道 (Web↔Web)';
-          }
-          dropZone.style.borderColor = '#f39c12';
-          dropZone.style.backgroundColor = '#fefcf3';
-        }
-      });
+      // 默认隐藏传输区域，除非有实际连接
+      transferSection.style.display = 'none';
+      
+      // 如果有实际连接，显示相应状态
+      if (this.connectionType === 'webrtc' && this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open') {
+        transferSection.style.display = 'block';
+        const dropContent = dropZone.querySelector('.drop-content p');
+        dropContent.textContent = '[P2P模式] WebRTC数据通道已建立，可以开始文件传输';
+        dropZone.style.borderColor = '#27ae60';
+        dropZone.style.backgroundColor = '#f0fff4';
+      } else if (this.connectionType === 'cli') {
+        transferSection.style.display = 'block';
+        const dropContent = dropZone.querySelector('.drop-content p');
+        dropContent.textContent = '[中转模式] CLI客户端已连接，通过服务器中转传输';
+        dropZone.style.borderColor = '#27ae60';
+        dropZone.style.backgroundColor = '#ffffff';
+      }
     } else {
       connectBtn.style.display = 'inline-block';
       disconnectBtn.style.display = 'none';
@@ -549,47 +510,6 @@ class WebRTCApp {
     return Math.random().toString(36).substr(2, 8).toUpperCase();
   }
   
-  // 检查房间中的客户端组成
-  async checkRoomComposition() {
-    return new Promise((resolve) => {
-      // 通过向服务器查询房间信息
-      if (this.webrtcManager.ws && this.webrtcManager.ws.readyState === WebSocket.OPEN) {
-        // 发送查询请求
-        this.webrtcManager.sendSignalingMessage({
-          type: 'room-info',
-          roomId: document.getElementById('room-id').value.trim()
-        });
-        
-        // 设置超时处理
-        const timeout = setTimeout(() => {
-          resolve({ hasCLI: false, members: [] });
-        }, 2000);
-        
-        // 临时监听响应
-        const handleRoomInfo = (message) => {
-          if (message.type === 'room-info-response') {
-            clearTimeout(timeout);
-            const hasCLI = message.members.some(member => member.clientType === 'cli');
-            resolve({ hasCLI, members: message.members });
-          }
-        };
-        
-        this.webrtcManager.ws.addEventListener('message', (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            if (message.type === 'room-info-response') {
-              handleRoomInfo(message);
-            }
-          } catch (e) {
-            console.error('Error parsing room info response:', e);
-          }
-        }, { once: true });
-      } else {
-        // 如果无法查询，默认认为可能有CLI
-        resolve({ hasCLI: true, members: [] });
-      }
-    });
-  }
   
   formatFileSize(bytes) {
     if (bytes === 0) return '0 B';
