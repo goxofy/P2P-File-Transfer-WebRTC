@@ -475,7 +475,8 @@ function handleRoomInfo(ws, data) {
     ws.send(JSON.stringify({
       type: 'room-info-response',
       roomId: roomId,
-      members: []
+      members: [],
+      memberCount: 0
     }));
     return;
   }
@@ -495,7 +496,8 @@ function handleRoomInfo(ws, data) {
   ws.send(JSON.stringify({
     type: 'room-info-response',
     roomId: roomId,
-    members: members
+    members: members,
+    memberCount: members.length
   }));
 }
 

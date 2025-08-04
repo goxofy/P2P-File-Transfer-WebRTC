@@ -196,6 +196,13 @@ class WebRTCManager {
           });
         }
         break;
+        
+      case 'room-info-response':
+        // 转发给应用层处理房间人数显示
+        if (this.onConnectionStateChange) {
+          this.onConnectionStateChange('room-update', message);
+        }
+        break;
     }
   }
   
@@ -290,20 +297,40 @@ class WebRTCManager {
   
   // 处理 Offer
   async handleOffer(message) {
-    await this.peerConnection.setRemoteDescription(message.offer);
+    // 检查连接状态，防止重复设置
+    if (this.peerConnection.signalingState !== 'stable') {
+      console.warn('收到offer时连接状态不正确:', this.peerConnection.signalingState);
+      return;
+    }
     
-    const answer = await this.peerConnection.createAnswer();
-    await this.peerConnection.setLocalDescription(answer);
-    
-    this.sendSignalingMessage({
-      type: 'answer',
-      answer: answer
-    });
+    try {
+      await this.peerConnection.setRemoteDescription(message.offer);
+      
+      const answer = await this.peerConnection.createAnswer();
+      await this.peerConnection.setLocalDescription(answer);
+      
+      this.sendSignalingMessage({
+        type: 'answer',
+        answer: answer
+      });
+    } catch (error) {
+      console.error('处理offer失败:', error);
+    }
   }
   
   // 处理 Answer
   async handleAnswer(message) {
-    await this.peerConnection.setRemoteDescription(message.answer);
+    // 检查连接状态，防止重复设置
+    if (this.peerConnection.signalingState !== 'have-local-offer') {
+      console.warn('收到answer时连接状态不正确:', this.peerConnection.signalingState);
+      return;
+    }
+    
+    try {
+      await this.peerConnection.setRemoteDescription(message.answer);
+    } catch (error) {
+      console.error('处理answer失败:', error);
+    }
   }
   
   // 处理 ICE 候选

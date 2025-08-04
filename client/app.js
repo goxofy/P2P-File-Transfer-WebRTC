@@ -88,7 +88,17 @@ class WebRTCApp {
   }
   
   setupWebRTCCallbacks() {
-    this.webrtcManager.onConnectionStateChange = (state) => {
+    this.webrtcManager.onConnectionStateChange = (state, data) => {
+      // 处理房间人数更新
+      if (state === 'room-update' && data) {
+        const roomIdInput = document.getElementById('room-id');
+        if (roomIdInput) {
+          const baseRoomId = roomIdInput.value.split(' (')[0];
+          roomIdInput.value = `${baseRoomId} (${data.memberCount}/2)`;
+        }
+        return;
+      }
+      
       this.updateConnectionStatus(state);
       
       if (state === 'connected-cli') {
@@ -97,10 +107,12 @@ class WebRTCApp {
         
         this.log('[中转模式] 已连接到CLI客户端，通过信令服务器中转传输', 'info');
         this.showTransferSection();
+        this.startRoomStatusCheck();
       } else if (state === 'connected') {
         this.connectionType = 'webrtc';
         this.fileTransfer.setConnectionType('p2p');
         this.log('[P2P模式] WebRTC数据通道已建立，点对点直接传输', 'success');
+        this.startRoomStatusCheck();
       } else if (state === 'fallback-to-relay') {
         this.connectionType = 'cli';
         this.fileTransfer.setConnectionType('cli');
@@ -108,12 +120,14 @@ class WebRTCApp {
         this.log('[回退成功] P2P连接失败，已自动回退到中转模式', 'warning');
         
         this.showTransferSection();
+        this.startRoomStatusCheck();
       } else if (state === 'connecting') {
         this.connectionType = 'connecting';
         this.fileTransfer.setConnectionType('p2p');
         this.log('[连接中] 正在建立连接...', 'info');
         // 连接中显示传输区域但隐藏按钮
         this.showTransferSection();
+        this.startRoomStatusCheck();
       } else if (state === 'disconnected') {
         this.connectionType = 'none';
         this.fileTransfer.setConnectionType('p2p');
@@ -122,6 +136,13 @@ class WebRTCApp {
         this.fileTransfer.stopAllTransfers();
         // 隐藏传输区域
         document.getElementById('transfer-section').style.display = 'none';
+        // 停止房间状态检查
+        this.stopRoomStatusCheck();
+        // 重置房间ID显示
+        const roomIdInput = document.getElementById('room-id');
+        if (roomIdInput) {
+          roomIdInput.value = roomIdInput.value.split(' (')[0];
+        }
         // 更新UI显示等待状态
         this.updateUI();
       } else {
@@ -137,6 +158,7 @@ class WebRTCApp {
       this.fileTransfer.setConnectionType('p2p');
       this.log('[P2P模式] WebRTC数据通道已建立，点对点直接传输', 'success');
       this.showTransferSection();
+      this.startRoomStatusCheck();
     };
     
     this.webrtcManager.onError = (error) => {
@@ -215,6 +237,12 @@ class WebRTCApp {
   }
   
   async connect() {
+    // 防止重复连接
+    if (this.isConnected || this.webrtcManager.ws) {
+      this.log('已连接或正在连接，请先断开当前连接', 'warning');
+      return;
+    }
+    
     const serverUrl = document.getElementById('server-url').value.trim();
     const roomId = document.getElementById('room-id').value.trim();
     
@@ -232,7 +260,7 @@ class WebRTCApp {
       this.log('[连接中] 正在连接到信令服务器...', 'info');
       
       await this.webrtcManager.connectToSignalingServer(serverUrl);
-      this.webrtcManager.joinRoom(document.getElementById('room-id').value);
+      this.webrtcManager.joinRoom(document.getElementById('room-id').value.split(' (')[0]);
       
       this.isConnected = true;
       this.updateUI();
@@ -254,6 +282,13 @@ class WebRTCApp {
     
     // 初始状态隐藏传输区域
     document.getElementById('transfer-section').style.display = 'none';
+    
+    // 重置房间ID显示（移除人数计数）
+    const roomIdInput = document.getElementById('room-id');
+    if (roomIdInput) {
+      roomIdInput.value = roomIdInput.value.split(' (')[0];
+    }
+    
     this.log('[已断开] 连接已断开', 'info');
   }
   
@@ -409,13 +444,25 @@ class WebRTCApp {
   }
 
 
-  // 移除定时器，改为事件驱动
+  // 实时更新房间人数
   startRoomStatusCheck() {
-    // 不再使用定时器，改为事件驱动更新
+    if (!this.roomStatusInterval) {
+      this.roomStatusInterval = setInterval(() => {
+        if (this.isConnected && this.webrtcManager.ws && this.webrtcManager.ws.readyState === WebSocket.OPEN) {
+          this.webrtcManager.sendSignalingMessage({
+            type: 'room-info',
+            roomId: this.webrtcManager.roomId
+          });
+        }
+      }, 2000); // 每2秒更新一次
+    }
   }
 
   stopRoomStatusCheck() {
-    // 清理不再使用
+    if (this.roomStatusInterval) {
+      clearInterval(this.roomStatusInterval);
+      this.roomStatusInterval = null;
+    }
   }
   
   updateUI() {
