@@ -142,8 +142,14 @@ class WebRTCApp {
     this.webrtcManager.onError = (error) => {
       this.log(`${error.type}: ${error.message}`, 'error');
       
-      // 根据错误类型采取不同处理
-      if (error.type === '重连失败') {
+      if (error.type === '传输中断') {
+        // 显示明确的传输中断提示
+        alert(`传输已中断：${error.message}\n\n房间已被清理，请重新连接。`);
+        this.fileTransfer.stopAllTransfers();
+        this.updateConnectionStatus('disconnected');
+        this.isConnected = false;
+        this.updateUI();
+      } else if (error.type === '重连失败') {
         this.updateConnectionStatus('disconnected');
         this.isConnected = false;
         this.updateUI();
@@ -182,7 +188,6 @@ class WebRTCApp {
             const titleElement = item.querySelector('h4');
             if (titleElement && titleElement.textContent.includes('Unknown File')) {
               titleElement.textContent = `${progress.fileName} (接收)`;
-              console.log('Updated transfer item title to:', progress.fileName);
             }
           }
         });
@@ -253,7 +258,6 @@ class WebRTCApp {
   }
   
   async handleFileSelection(files) {
-    console.log('文件选择:', files);
     
     // 检查是否已连接到信令服务器
     if (!this.isConnected) {
@@ -348,20 +352,16 @@ class WebRTCApp {
     `;
     
     transferList.appendChild(transferItem);
-    console.log('Created transfer item:', itemId, 'for file:', fileName);
     return itemId;
   }
   
   updateTransferProgress(progress) {
-    console.log('Update progress:', progress);
     
     // 通过 transferId 找到对应的传输项目
     const transferItems = document.querySelectorAll('.transfer-item');
-    console.log('Looking for transferId:', progress.transferId);
     
     let found = false;
     transferItems.forEach(item => {
-      console.log('Checking item transferId:', item.dataset.transferId);
       if (item.dataset.transferId === progress.transferId) {
         found = true;
         const progressText = item.querySelector('.progress-text');
@@ -377,13 +377,11 @@ class WebRTCApp {
         
         progressText.textContent = `[${progressBar}] ${percentage}% (${this.formatFileSize(current)} / ${this.formatFileSize(progress.total)})`;
         
-        console.log(`Updated progress for ${progress.fileName}: ${percentage}%`);
         return;
       }
     });
     
     if (!found) {
-      console.warn('Transfer item not found for transferId:', progress.transferId);
     }
   }
   

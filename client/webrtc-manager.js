@@ -51,7 +51,6 @@ class WebRTCManager {
         }, 10000); // 10秒超时
         
         this.ws.onopen = () => {
-          console.log('Connected to signaling server');
           clearTimeout(this.connectionTimeout);
           this.reconnectAttempts = 0;
           
@@ -61,7 +60,6 @@ class WebRTCManager {
         };
         
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
           clearTimeout(this.connectionTimeout);
           this.handleConnectionError(error);
           reject(new Error('WebSocket连接失败'));
@@ -71,13 +69,11 @@ class WebRTCManager {
           try {
             this.handleSignalingMessage(JSON.parse(event.data));
           } catch (error) {
-            console.error('Error parsing signaling message:', error);
             this.handleError('信令消息解析错误', error);
           }
         };
         
         this.ws.onclose = (event) => {
-          console.log('Disconnected from signaling server, code:', event.code);
           clearTimeout(this.connectionTimeout);
           
           // 如果不是主动断开连接，尝试重连
@@ -104,27 +100,22 @@ class WebRTCManager {
   
   // 处理信令消息
   async handleSignalingMessage(message) {
-    console.log('Received signaling message:', message.type, 'isInitiator:', this.isInitiator);
     
     switch (message.type) {
       case 'room-joined':
-        console.log('Joined room:', message.roomId, 'existing members:', message.existingMembers);
         if (message.existingMembers.length > 0) {
           // 检查是否有其他Web客户端
           const webClients = message.existingMembers.filter(member => member.clientType === 'web');
           const cliClients = message.existingMembers.filter(member => member.clientType === 'cli');
           
-          console.log(`Found ${webClients.length} web clients and ${cliClients.length} CLI clients`);
           
           if (webClients.length > 0) {
             // 如果房间里已有其他Web客户端，作为发起方建立WebRTC连接
-            console.log('Setting as WebRTC initiator (room has existing web clients)');
             this.isInitiator = true;
             await this.initializePeerConnection();
             await this.createOffer();
           } else if (cliClients.length > 0) {
             // 只有CLI客户端，标记为连接状态但不建立WebRTC
-            console.log('Connected to CLI clients only, no WebRTC needed');
             if (this.onConnectionStateChange) {
               this.onConnectionStateChange('connected-cli');
             }
@@ -133,39 +124,32 @@ class WebRTCManager {
         break;
         
       case 'peer-joined':
-        console.log('Peer joined:', message.clientId, 'type:', message.clientType, 'current isInitiator:', this.isInitiator);
         
         if (message.clientType === 'cli') {
           // CLI客户端加入，不需要建立WebRTC连接，但需要通知应用
-          console.log('CLI client joined, no WebRTC connection needed');
           if (this.onConnectionStateChange) {
             this.onConnectionStateChange('connected-cli');
           }
         } else if (!this.isInitiator && !this.peerConnection) {
           // Web客户端加入，作为接收方初始化WebRTC连接
-          console.log('Initializing WebRTC as receiver');
           await this.initializePeerConnection();
           this.startP2PTimeout();
         }
         break;
         
       case 'offer':
-        console.log('Received offer');
         await this.handleOffer(message);
         break;
         
       case 'answer':
-        console.log('Received answer');
         await this.handleAnswer(message);
         break;
         
       case 'ice-candidate':
-        console.log('Received ICE candidate');
         await this.handleIceCandidate(message);
         break;
         
       case 'peer-left':
-        console.log('Peer left:', message.clientId);
         // 不管是WebRTC还是CLI模式，都需要通知连接状态变化
         if (this.onConnectionStateChange) {
           this.onConnectionStateChange('disconnected');
@@ -174,14 +158,12 @@ class WebRTCManager {
         break;
         
       case 'data':
-        console.log('Received data message from CLI');
         if (this.onDataChannelMessage) {
           this.onDataChannelMessage(message.data);
         }
         break;
         
       case 'transfer-error':
-        console.log('Received transfer error:', message.error);
         this.transferStopped = true; // 设置传输停止标志
         if (this.onError) {
           this.onError({
@@ -195,8 +177,18 @@ class WebRTCManager {
         }
         break;
         
+      case 'transfer-interrupted':
+        if (this.onError) {
+          this.onError({
+            type: '传输中断',
+            message: message.message
+          });
+        }
+        // 强制断开连接
+        this.disconnect();
+        break;
+        
       case 'room-full':
-        console.log('Room is full:', message.message);
         if (this.onError) {
           this.onError({
             type: '房间已满',
@@ -209,7 +201,6 @@ class WebRTCManager {
   
   // 初始化 RTCPeerConnection
   async initializePeerConnection() {
-    console.log('Initializing PeerConnection, isInitiator:', this.isInitiator);
     
     this.peerConnection = new RTCPeerConnection({
       iceServers: this.iceServers
@@ -218,7 +209,6 @@ class WebRTCManager {
     // ICE 候选事件
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log('Sending ICE candidate');
         this.sendSignalingMessage({
           type: 'ice-candidate',
           candidate: event.candidate
@@ -228,14 +218,12 @@ class WebRTCManager {
     
     // 连接状态变化
     this.peerConnection.onconnectionstatechange = () => {
-      console.log('Connection state:', this.peerConnection.connectionState);
       
       // 处理P2P连接失败，尝试回退到中转模式
       if (this.peerConnection.connectionState === 'failed' || 
           this.peerConnection.connectionState === 'disconnected' ||
           this.peerConnection.connectionState === 'closed') {
         
-        console.log('P2P连接失败，检查是否可以回退到中转模式');
         this.p2pFailed = true;
         
         // 清除P2P连接超时
@@ -254,46 +242,38 @@ class WebRTCManager {
     
     // 接收到 DataChannel
     this.peerConnection.ondatachannel = (event) => {
-      console.log('Received DataChannel from peer:', event.channel.label);
       this.setupDataChannel(event.channel);
     };
     
     // 如果是发起方，创建 DataChannel
     if (this.isInitiator) {
-      console.log('Creating DataChannel as initiator');
       this.dataChannel = this.peerConnection.createDataChannel('fileTransfer', {
         ordered: true
       });
       this.setupDataChannel(this.dataChannel);
       this.startP2PTimeout();
     } else {
-      console.log('Waiting for DataChannel as receiver');
     }
   }
   
   // 设置 DataChannel
   setupDataChannel(channel) {
-    console.log('Setting up DataChannel:', channel.label, 'readyState:', channel.readyState);
     this.dataChannel = channel;
     
     this.dataChannel.onopen = () => {
-      console.log('DataChannel opened, label:', this.dataChannel.label);
       if (this.onDataChannelOpen) {
         this.onDataChannelOpen();
       }
     };
     
     this.dataChannel.onmessage = (event) => {
-      console.log('DataChannel message received');
       this.handleDataChannelMessage(event.data);
     };
     
     this.dataChannel.onerror = (error) => {
-      console.error('DataChannel error:', error);
     };
     
     this.dataChannel.onclose = () => {
-      console.log('DataChannel closed');
     };
   }
   
@@ -340,37 +320,30 @@ class WebRTCManager {
   
   // 处理 DataChannel 消息
   handleDataChannelMessage(data) {
-    console.log('DataChannel received message, type:', typeof data, 'data:', data instanceof Blob ? 'Blob' : data instanceof ArrayBuffer ? 'ArrayBuffer' : 'other');
     
     if (this.onDataChannelMessage) {
       this.onDataChannelMessage(data);
-    } else {
-      console.warn('No DataChannel message handler set');
+    }
     }
   }
   
   // 发送数据通过 DataChannel
   // 发送数据 (支持WebRTC和CLI模式)，带队列控制和重试机制
   async sendData(data) {
-    console.log('Attempting to send data, length:', data.length, 'DataChannel state:', this.dataChannel?.readyState, 'WebSocket state:', this.ws?.readyState);
     
     // 如果有WebRTC连接，优先使用WebRTC
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
       try {
         // 检查缓冲区状态，避免队列溢出
         if (this.dataChannel.bufferedAmount > 0) {
-          console.log('DataChannel buffer not empty, waiting... bufferedAmount:', this.dataChannel.bufferedAmount);
           await this.waitForBufferToClear();
         }
         
         this.dataChannel.send(data);
-        console.log('Data sent via WebRTC DataChannel');
         return true;
       } catch (error) {
-        console.error('Error sending data via WebRTC:', error);
         // 如果是缓冲区满的错误，等待后重试
         if (error.name === 'OperationError' && error.message.includes('send queue is full')) {
-          console.log('Buffer full, waiting and retrying...');
           // 根据缓冲区大小动态调整等待时间
           const waitTime = Math.min(50 + this.dataChannel.bufferedAmount / 1000, 200); // 动态等待50-200ms
           await this.delay(waitTime);
@@ -378,7 +351,6 @@ class WebRTCManager {
             this.dataChannel.send(data);
             return true;
           } catch (retryError) {
-            console.error('Retry failed:', retryError);
             return false;
           }
         }
@@ -393,10 +365,8 @@ class WebRTCManager {
           data: JSON.parse(data), // data应该是JSON字符串
           roomId: this.roomId
         });
-        console.log('Data sent via WebSocket to CLI');
         return true;
       } catch (error) {
-        console.error('Error sending data via WebSocket:', error);
         // 如果是传输错误，停止继续发送
         if (this.onError) {
           this.onError({
@@ -407,7 +377,6 @@ class WebRTCManager {
         return false;
       }
     } else {
-      console.warn('No available connection for sending data (transferStopped:', this.transferStopped, ')');
       return false;
     }
   }
@@ -462,7 +431,6 @@ class WebRTCManager {
   
   // 错误处理方法
   handleConnectionError(error) {
-    console.error('Connection error:', error);
     this.handleError('连接错误', error);
   }
   
@@ -479,7 +447,6 @@ class WebRTCManager {
   // 重连尝试
   attemptReconnect(serverUrl) {
     this.reconnectAttempts++;
-    console.log(`尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
     setTimeout(() => {
       this.connectToSignalingServer(serverUrl)
@@ -489,7 +456,6 @@ class WebRTCManager {
           }
         })
         .catch((error) => {
-          console.error('重连失败:', error);
           if (this.reconnectAttempts >= this.maxReconnectAttempts) {
             this.handleError('重连失败', new Error('已达到最大重连次数'));
           }
@@ -561,7 +527,6 @@ class WebRTCManager {
     // 设置P2P连接超时（30秒）
     this.p2pConnectionTimeout = setTimeout(() => {
       if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-        console.log('P2P连接超时，准备回退到中转模式');
         this.p2pFailed = true;
         this.checkFallbackToRelay();
       }
@@ -570,7 +535,6 @@ class WebRTCManager {
   
   // 检查并回退到中转模式
   checkFallbackToRelay() {
-    console.log('正在尝试回退到中转模式...');
     
     // 关闭失败的P2P连接
     this.closePeerConnection();
@@ -585,7 +549,6 @@ class WebRTCManager {
       this.onConnectionStateChange('connected-cli');
     }
     
-    console.log('已回退到中转模式');
   }
   
   // 关闭P2P连接但保持WebSocket连接

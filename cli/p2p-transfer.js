@@ -119,6 +119,14 @@ class P2PTransfer extends EventEmitter {
         this.emit('transfer-error', message.error);
         break;
         
+      case 'transfer-interrupted':
+        this.transferStopped = true;
+        this.log(`传输中断: ${message.message}`, 'error');
+        this.log('房间已被清理，请重新连接', 'info');
+        this.disconnect();
+        this.emit('transfer-interrupted', message.message);
+        break;
+        
       case 'room-full':
         this.log(`${message.message}`, 'error');
         this.emit('room-full', message.message);

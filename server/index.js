@@ -62,7 +62,6 @@ const transferCleanupInterval = setInterval(() => {
   const now = Date.now();
   activeTransfers.forEach((transfer, transferId) => {
     if (now - transfer.startTime > TRANSFER_TIMEOUT) {
-      console.log(`传输超时清理: ${transferId}`);
       activeTransfers.delete(transferId);
       
       // 通知相关客户端
@@ -83,7 +82,6 @@ const transferCleanupInterval = setInterval(() => {
 }, TRANSFER_TIMEOUT / 2);
 
 wss.on('connection', (ws) => {
-  console.log('New client connected');
   
   // 设置心跳相关属性
   ws.isAlive = true;
@@ -93,7 +91,6 @@ wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
-      console.log('Received:', data.type);
       
       switch (data.type) {
         case 'join':
@@ -122,17 +119,15 @@ wss.on('connection', (ws) => {
           break;
       }
     } catch (error) {
-      console.error('Error parsing message:', error);
+      // 静默处理解析错误
     }
   });
   
   ws.on('close', () => {
-    console.log('Client disconnected');
     handleLeave(ws);
   });
   
   ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
     handleLeave(ws);
   });
   
@@ -185,7 +180,6 @@ function handleJoinRoom(ws, data) {
   clients.set(ws, { clientId, roomId, mode: 'cli' });
   room.add(ws);
   
-  console.log(`CLI client ${clientId} joined room ${roomId} (${room.size}/2)`);
   
   // 通知房间内其他客户端有新成员加入
   const roomMembers = Array.from(room).filter(client => client !== ws);
@@ -229,7 +223,6 @@ function handleDataRelay(ws, data) {
   // 检查是否是文件传输开始
   if (data.data && data.data.type === 'file-info') {
     const transferId = data.data.id;
-    console.log(`Starting transfer tracking for ${transferId} in room ${roomId}`);
     activeTransfers.set(transferId, {
       senderId: client.clientId,
       senderWs: ws,
@@ -241,7 +234,6 @@ function handleDataRelay(ws, data) {
   // 检查是否是文件传输完成
   if (data.data && data.data.type === 'file-complete') {
     const transferId = data.data.transferId;
-    console.log(`Transfer completed: ${transferId}`);
     activeTransfers.delete(transferId);
   }
   
@@ -255,7 +247,6 @@ function handleDataRelay(ws, data) {
   
   // 如果没有活跃的接收端，通知发送端并停止该客户端的所有传输
   if (activeTargets.length === 0) {
-    console.log(`No active targets for data relay in room ${roomId}, stopping transfers`);
     
     // 停止该发送端的所有活跃传输
     const transfersToStop = [];
@@ -266,7 +257,6 @@ function handleDataRelay(ws, data) {
     });
     
     transfersToStop.forEach(transferId => {
-      console.log(`Force stopping transfer: ${transferId}`);
       activeTransfers.delete(transferId);
     });
     
@@ -291,13 +281,11 @@ function handleDataRelay(ws, data) {
       }));
       successCount++;
     } catch (error) {
-      console.error(`Failed to relay data to client: ${error.message}`);
     }
   });
   
   // 如果转发失败，通知发送端并停止传输
   if (successCount === 0) {
-    console.log(`Failed to relay data to any target in room ${roomId}`);
     
     // 停止该发送端的所有活跃传输
     const transfersToStop = [];
@@ -308,7 +296,6 @@ function handleDataRelay(ws, data) {
     });
     
     transfersToStop.forEach(transferId => {
-      console.log(`Force stopping failed transfer: ${transferId}`);
       activeTransfers.delete(transferId);
     });
     
@@ -319,7 +306,6 @@ function handleDataRelay(ws, data) {
   }
   
   if (data.data.type === 'file-info') {
-    console.log(`File transfer started: ${data.data.name} in room ${roomId} (${successCount} receivers)`);
   }
 }
 
@@ -359,7 +345,6 @@ function handleJoin(ws, data) {
   clients.set(ws, { clientId, roomId, mode: 'web' });
   room.add(ws);
   
-  console.log(`Web client ${clientId} joined room ${roomId} (${room.size}/2)`);
   
   // 通知房间内其他客户端有新成员加入 (包括CLI客户端)
   const roomMembers = Array.from(room).filter(client => client !== ws);
@@ -416,6 +401,8 @@ function handleLeave(ws) {
   const { clientId, roomId } = client;
   const room = rooms.get(roomId);
   
+  if (!room) return;
+  
   // 立即停止所有相关传输
   const transfersToStop = [];
   activeTransfers.forEach((transfer, transferId) => {
@@ -424,38 +411,40 @@ function handleLeave(ws) {
     }
   });
   
-  // 通知相关方并清理传输
-  transfersToStop.forEach(({transferId, transfer}) => {
-    if (transfer.senderWs.readyState === WebSocket.OPEN) {
-      transfer.senderWs.send(JSON.stringify({
-        type: 'stop-transfer',
-        transferId: transferId,
+  // 通知所有客户端传输中断并强制断开
+  room.forEach(otherWs => {
+    if (otherWs.readyState === WebSocket.OPEN) {
+      otherWs.send(JSON.stringify({
+        type: 'transfer-interrupted',
+        message: '传输已中断，房间将被清理',
         reason: 'peer-disconnected'
       }));
+      // 强制关闭其他客户端连接
+      setTimeout(() => {
+        if (otherWs.readyState === WebSocket.OPEN) {
+          otherWs.close(1000, 'Room force closed due to transfer interruption');
+        }
+      }, 1000);
     }
+  });
+  
+  // 清理所有传输
+  transfersToStop.forEach(({transferId}) => {
     activeTransfers.delete(transferId);
   });
   
-  // 清理房间和客户端
-  if (room) {
-    room.delete(ws);
-    
-    // 通知其他客户端
-    room.forEach(otherWs => {
-      if (otherWs.readyState === WebSocket.OPEN) {
-        otherWs.send(JSON.stringify({
-          type: 'peer-left',
-          clientId: clientId
-        }));
-      }
-    });
-    
-    // 清理空房间
-    if (room.size === 0) {
-      rooms.delete(roomId);
+  // 强制清理整个房间
+  room.forEach(roomClient => {
+    if (roomClient !== ws && roomClient.readyState === WebSocket.OPEN) {
+      roomClient.terminate();
     }
-  }
+    clients.delete(roomClient);
+  });
   
+  // 删除房间
+  rooms.delete(roomId);
+  
+  // 清理当前客户端
   clients.delete(ws);
 }
 

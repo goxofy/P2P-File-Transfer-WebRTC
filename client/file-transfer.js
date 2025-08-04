@@ -29,14 +29,12 @@ class FileTransferManager {
       fileType: file.type,  // 改名为 fileType 避免冲突
       lastModified: file.lastModified
     };
-    this.log('开始文件传输: ' + fileInfo.name + ' (' + this.formatFileSize(fileInfo.size) + ')');
     
     // 如果提供了 UI 元素 ID，立即关联
     if (uiItemId) {
       const element = document.getElementById(uiItemId);
       if (element) {
         element.dataset.transferId = transferId;
-        console.log('Associated transferId', transferId, 'with UI element', uiItemId);
       }
     }
     
@@ -45,7 +43,6 @@ class FileTransferManager {
       type: 'file-info',
       ...fileInfo
     };
-    this.log('发送文件信息: ' + fileInfo.name);
     await this.sendMessage(fileInfoMessage);
     
     // 给接收端一些时间处理 file-info 消息
@@ -67,7 +64,6 @@ class FileTransferManager {
       // 检查传输是否已被停止
       const transfer = this.activeTransfers.get(transferId);
       if (!transfer) {
-        console.log('Transfer stopped, cancelling file send for:', transferId, 'at chunk:', i);
         return null;
       }
       
@@ -85,7 +81,6 @@ class FileTransferManager {
       
       // 如果发送失败，停止传输
       if (!success) {
-        console.log('Failed to send chunk', i, ', stopping transfer:', transferId);
         this.activeTransfers.delete(transferId);
         if (this.onTransferError) {
           this.onTransferError({
@@ -121,7 +116,6 @@ class FileTransferManager {
     // 检查传输是否已被停止（最终检查）
     const finalTransfer = this.activeTransfers.get(transferId);
     if (!finalTransfer) {
-      console.log('Transfer was stopped before completion, not sending file-complete message');
       return null;
     }
     
@@ -149,8 +143,7 @@ class FileTransferManager {
       }
       
       // 在中转模式下，发送方需要等待接收方确认，不要立即触发完成事件
-      this.log('[中转模式] 文件已发送完成，等待接收方确认...');
-    } else {
+      } else {
       // P2P模式下可以立即完成
       if (this.onTransferComplete) {
         this.onTransferComplete({
@@ -174,20 +167,17 @@ class FileTransferManager {
       
       // 处理二进制数据（文件块）
       if (data instanceof ArrayBuffer) {
-        console.warn('Received raw ArrayBuffer, expecting JSON message');
         return;
       }
       
       // 处理 Blob 数据
       if (data instanceof Blob) {
-        console.log('Received Blob data, converting to text');
         const reader = new FileReader();
         reader.onload = () => {
           try {
             const message = JSON.parse(reader.result);
             this.handleParsedMessage(message);
           } catch (error) {
-            console.error('Error parsing Blob message:', error);
           }
         };
         reader.readAsText(data);
@@ -200,15 +190,12 @@ class FileTransferManager {
         this.handleParsedMessage(message);
       } else if (typeof data === 'object' && data !== null) {
         // 处理已经解析的对象（来自CLI通过WebSocket）
-        console.log('Received parsed object from CLI:', data);
         this.handleParsedMessage(data);
       } else {
-        console.warn('Unknown data type:', typeof data, data);
         return;
       }
       
     } catch (error) {
-      console.error('Error handling message:', error);
       if (this.onTransferError) {
         this.onTransferError({ error: error.message });
       }
@@ -221,13 +208,11 @@ class FileTransferManager {
     
     // 只显示重要消息类型，隐藏file-chunk等详细消息
     if (message.type !== 'file-chunk') {
-      this.log('处理消息: ' + message.type + ' id: ' + messageId);
     }
     
     switch (message.type) {
       case 'file-info':
-        this.log('处理文件信息: ' + message.name + ' ' + this.formatFileSize(message.size) + ', transferId: ' + message.id);
-        this.handleFileInfo(message);
+          this.handleFileInfo(message);
         break;
       case 'file-chunk':
         this.handleFileChunk(message);
@@ -246,12 +231,10 @@ class FileTransferManager {
   
   // 处理文件信息
   handleFileInfo(fileInfo) {
-    console.log('Receiving file:', fileInfo.name, fileInfo.size, 'bytes', 'transferId:', fileInfo.id);
     
     // 检查是否已存在该传输（可能是临时创建的）
     const existingFile = this.receivingFiles.get(fileInfo.id);
     if (existingFile) {
-      console.log('Updating existing transfer record with file info');
       // 更新现有记录的文件信息
       existingFile.info = fileInfo;
       existingFile.isTemporary = false;
@@ -279,7 +262,6 @@ class FileTransferManager {
       isTemporary: false
     });
     
-    console.log('Created receiving file record for transfer:', fileInfo.id);
     
     // 通知应用程序开始接收文件
     if (this.onTransferProgress) {
@@ -297,22 +279,17 @@ class FileTransferManager {
   // 处理文件块
   handleFileChunk(message) {
     const { transferId, chunkIndex, totalChunks, data } = message;
-    console.log('Handling file chunk:', chunkIndex, '/', totalChunks, 'for transfer:', transferId);
     
     let receivingFile = this.receivingFiles.get(transferId);
     
     if (!receivingFile) {
-      console.error('Received chunk for unknown transfer:', transferId);
-      console.log('Available transfers:', Array.from(this.receivingFiles.keys()));
       
       // 阻止无限循环：如果已经创建过临时记录就不要重复处理
       if (this.receivingFiles.has(transferId + '_temp')) {
-        console.warn('Temporary record already exists, skipping chunk:', chunkIndex);
         return;
       }
       
       // 尝试创建一个临时的传输记录
-      console.log('Creating temporary transfer record for:', transferId);
       receivingFile = {
         info: {
           id: transferId,
@@ -345,7 +322,6 @@ class FileTransferManager {
     
     // 检查是否已经处理过这个块
     if (receivingFile.chunks.has(chunkIndex)) {
-      console.warn('Chunk already processed:', chunkIndex, 'for transfer:', transferId);
       return;
     }
     
@@ -370,17 +346,13 @@ class FileTransferManager {
   // 处理文件传输完成
   handleFileComplete(message) {
     const { transferId, senderId } = message;
-    console.log('Handling file complete for transfer:', transferId, 'senderId:', senderId);
     
     const receivingFile = this.receivingFiles.get(transferId);
     
     if (!receivingFile) {
-      console.error('Received completion for unknown transfer:', transferId);
-      console.log('Available transfers:', Array.from(this.receivingFiles.keys()));
       return;
     }
     
-    console.log('Reassembling file for transfer:', transferId);
     
     // 重组文件
     const fileBlob = this.reassembleFile(receivingFile);
@@ -409,7 +381,6 @@ class FileTransferManager {
     
     // 如果是中转模式，发送确认消息给发送方
     if (this.connectionType === 'cli') {
-      console.log('Sending file-received-confirmation in CLI mode:', receivingFile.info.name, transferId);
       this.sendMessage({
         type: 'file-received-confirmation',
         transferId: transferId,
@@ -444,7 +415,6 @@ class FileTransferManager {
   // 设置连接类型
   setConnectionType(type) {
     this.connectionType = type;
-    this.log('连接类型设置为: ' + type);
   }
 
   // 日志方法
@@ -452,31 +422,25 @@ class FileTransferManager {
     if (this.onLog) {
       this.onLog(message);
     } else {
-      console.log(message);
     }
   }
   
   // 发送消息（异步）
   async sendMessage(message) {
     const messageId = message.transferId || message.id || 'no-id';
-    console.log('Sending message:', message.type, 'id:', messageId);
     
     // 对于文件块，需要特殊处理二进制数据
     if (message.type === 'file-chunk' && message.data instanceof ArrayBuffer) {
       // 将 ArrayBuffer 转换为 base64
       message.data = this.arrayBufferToBase64(message.data);
-      console.log('Converted chunk to base64, length:', message.data.length);
     }
     
     const messageStr = JSON.stringify(message);
-    console.log('Sending JSON message length:', messageStr.length);
     
     try {
       const success = await this.webrtcManager.sendData(messageStr);
-      console.log('Message send result:', success, 'for message type:', message.type);
       return success;
     } catch (error) {
-      console.error('Error sending message:', error);
       return false;
     }
   }
@@ -520,7 +484,6 @@ class FileTransferManager {
   // 处理接收方确认消息（中转模式专用）
   handleFileReceivedConfirmation(message) {
     const { transferId, fileName, fileSize, duration } = message;
-    console.log('Received confirmation from receiver:', fileName, transferId);
     
     // 找到对应的传输记录
     const transferElement = document.querySelector(`[data-transfer-id="${transferId}"]`);
@@ -542,16 +505,13 @@ class FileTransferManager {
       });
     }
     
-    this.log('[中转模式] 接收方已确认收到文件，传输完成');
   }
   
   // 停止所有正在进行的传输
   stopAllTransfers() {
-    console.log('Stopping all active transfers, current count:', this.activeTransfers.size);
     
     // 停止发送传输
     this.activeTransfers.forEach((transfer, transferId) => {
-      console.log('Stopping send transfer:', transferId, transfer.file.name);
       if (this.onTransferError) {
         this.onTransferError({
           transferId: transferId,
@@ -564,7 +524,6 @@ class FileTransferManager {
     
     // 停止接收传输
     this.receivingFiles.forEach((transfer, transferId) => {
-      console.log('Stopping receive transfer:', transferId, transfer.info.name);
       if (this.onTransferError) {
         this.onTransferError({
           transferId: transferId,
@@ -579,7 +538,6 @@ class FileTransferManager {
     this.activeTransfers.clear();
     this.receivingFiles.clear();
     
-    console.log('All transfers stopped, remaining counts - active:', this.activeTransfers.size, 'receiving:', this.receivingFiles.size);
   }
   
   // 格式化文件大小
