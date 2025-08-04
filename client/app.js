@@ -448,65 +448,30 @@ class WebRTCApp {
     const connectBtn = document.getElementById('connect-btn');
     const disconnectBtn = document.getElementById('disconnect-btn');
     const transferSection = document.getElementById('transfer-section');
-    const dropZone = document.getElementById('file-drop-zone');
+    const selectFileBtn = document.getElementById('select-file-btn');
     
     if (this.isConnected) {
       connectBtn.style.display = 'none';
       disconnectBtn.style.display = 'inline-block';
-      
-      // 显示传输区域，根据连接状态显示不同提示
       transferSection.style.display = 'block';
       
-      if (this.connectionType === 'cli') {
-        // CLI模式 - 直接显示
-        const dropContent = dropZone.querySelector('.drop-content p');
-        dropContent.textContent = '[中转模式] 已连接，可以开始文件传输';
-        dropZone.style.borderColor = '#27ae60';
-        dropZone.style.backgroundColor = '#ffffff';
-      } else if (this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open') {
-        // WebRTC模式 - 已建立连接
-        const dropContent = dropZone.querySelector('.drop-content p');
-        dropContent.textContent = '[P2P模式] WebRTC数据通道已建立，可以开始文件传输';
-        dropZone.style.borderColor = '#27ae60';
-        dropZone.style.backgroundColor = '#f0fff4';
-      } else {
-        // WebRTC模式 - 等待连接
-        const dropContent = dropZone.querySelector('.drop-content p');
-        dropContent.textContent = '等待另一个用户连接以建立数据通道...';
-        dropZone.style.borderColor = '#f39c12';
-        dropZone.style.backgroundColor = '#fefcf3';
-      }
+      // 只有在实际连接建立后才显示Select Files按钮
+      const hasActiveConnection = (this.connectionType === 'cli') || 
+                                  (this.webrtcManager.dataChannel && this.webrtcManager.dataChannel.readyState === 'open');
+      
+      selectFileBtn.style.display = hasActiveConnection ? 'inline-block' : 'none';
     } else {
       connectBtn.style.display = 'inline-block';
       disconnectBtn.style.display = 'none';
       transferSection.style.display = 'none';
-      
-      // 重置文件区域样式
-      const dropContent = dropZone.querySelector('.drop-content p');
-      dropContent.textContent = '拖拽文件到这里或点击选择文件';
-      dropZone.style.borderColor = '#3498db';
-      dropZone.style.backgroundColor = '#f8f9fa';
+      selectFileBtn.style.display = 'inline-block';
     }
   }
   
   showTransferSection() {
-    // 只有在连接建立后才显示传输区域
-    if (this.connectionType === 'webrtc' || this.connectionType === 'cli') {
-      document.getElementById('transfer-section').style.display = 'block';
-      
-      // 更新文件传输区域的状态提示
-      const dropZone = document.getElementById('file-drop-zone');
-      const dropContent = dropZone.querySelector('.drop-content p');
-      
-      if (this.connectionType === 'webrtc') {
-        dropContent.textContent = '[P2P模式] WebRTC数据通道已建立，可以开始文件传输';
-      } else if (this.connectionType === 'cli') {
-        dropContent.textContent = '[中转模式] CLI客户端已连接，通过服务器中转传输';
-      }
-      
-      dropZone.style.borderColor = '#27ae60';
-      dropZone.style.backgroundColor = '#f0fff4';
-    }
+    // 直接显示传输区域
+    document.getElementById('transfer-section').style.display = 'block';
+    this.updateUI();
   }
   
   generateRoomId() {
