@@ -95,6 +95,9 @@ wss.on('connection', (ws) => {
         case 'leave':
           handleLeave(ws);
           break;
+        case 'room-info':
+          handleRoomInfo(ws, data);
+          break;
         case 'ping': // 处理客户端心跳
           ws.isAlive = true;
           ws.send(JSON.stringify({ type: 'pong' }));
@@ -447,6 +450,38 @@ function handleLeave(ws) {
   
   clients.delete(ws);
   console.log(`Client ${clientId} left room ${roomId}, stopped ${transfersToStopAsSender.length} transfers as sender, ${transfersToStopAsReceiver.length} transfers as receiver`);
+}
+
+function handleRoomInfo(ws, data) {
+  const { roomId } = data;
+  const room = rooms.get(roomId);
+  
+  if (!room) {
+    ws.send(JSON.stringify({
+      type: 'room-info-response',
+      roomId: roomId,
+      members: []
+    }));
+    return;
+  }
+  
+  // 获取房间内的成员信息
+  const members = Array.from(room)
+    .filter(client => client.readyState === WebSocket.OPEN)
+    .map(client => {
+      const clientInfo = clients.get(client);
+      return clientInfo ? {
+        clientId: clientInfo.clientId,
+        clientType: clientInfo.mode || 'unknown'
+      } : null;
+    })
+    .filter(Boolean);
+  
+  ws.send(JSON.stringify({
+    type: 'room-info-response',
+    roomId: roomId,
+    members: members
+  }));
 }
 
 

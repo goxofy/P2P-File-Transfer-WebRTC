@@ -95,15 +95,7 @@ class WebRTCApp {
         this.connectionType = 'cli';
         this.fileTransfer.setConnectionType('cli');
         
-        // 检查房间中的客户端类型，提供准确的描述
-        this.checkRoomComposition().then(roomInfo => {
-          if (roomInfo.hasCLI) {
-            this.log('[中转模式] 已连接到CLI客户端，通过信令服务器中转传输', 'info');
-          } else {
-            this.log('[中转模式] P2P连接失败，通过信令服务器中转传输 (Web↔Web)', 'info');
-          }
-        });
-        
+        this.log('[中转模式] 已连接到CLI客户端，通过信令服务器中转传输', 'info');
         this.showTransferSection();
       } else if (state === 'connected') {
         this.connectionType = 'webrtc';
@@ -113,14 +105,7 @@ class WebRTCApp {
         this.connectionType = 'cli';
         this.fileTransfer.setConnectionType('cli');
         
-        // 回退时检查房间组成
-        this.checkRoomComposition().then(roomInfo => {
-          if (roomInfo.hasCLI) {
-            this.log('[回退成功] P2P连接失败，已自动回退到中转模式 (Web↔CLI)', 'warning');
-          } else {
-            this.log('[回退成功] P2P连接失败，已自动回退到中转模式 (Web↔Web)', 'warning');
-          }
-        });
+        this.log('[回退成功] P2P连接失败，已自动回退到中转模式', 'warning');
         
         this.showTransferSection();
       } else if (state === 'connecting') {
