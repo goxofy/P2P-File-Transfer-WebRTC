@@ -113,6 +113,7 @@ class WebRTCApp {
         this.fileTransfer.setConnectionType('p2p');
         this.log('[连接中] 正在建立连接...', 'info');
         // 连接中显示传输区域但隐藏按钮
+        this.showTransferSection();
       } else if (state === 'disconnected') {
         this.connectionType = 'none';
         this.fileTransfer.setConnectionType('p2p');
@@ -439,7 +440,7 @@ class WebRTCApp {
         dropZone.style.backgroundColor = '#f0fff4';
         selectFileBtn.style.display = 'inline-block';
       } else if (this.connectionType === 'connecting') {
-        // 连接中状态 - 只在两个web用户建立P2P时显示
+        // 连接中状态 - 与"正在建立连接..."对应
         const dropContent = dropZone.querySelector('.drop-content p');
         dropContent.textContent = '[连接中] 正在尝试建立P2P连接...';
         dropZone.style.borderColor = '#27ae60';
