@@ -465,7 +465,7 @@ class WebRTCApp {
       } else {
         // WebRTC模式 - 等待连接
         const dropContent = dropZone.querySelector('.drop-content p');
-        dropContent.textContent = '等待另一个用户连接以建立数据通道...';
+        dropContent.textContent = '[连接中] 正在尝试建立P2P连接...';
         dropZone.style.borderColor = '#27ae60';
         dropZone.style.backgroundColor = '#f0fff4';
         selectFileBtn.style.display = 'none'; // 隐藏Select Files按钮
