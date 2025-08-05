@@ -7,6 +7,7 @@ class WebRTCManager {
     this.roomId = null;
     this.isInitiator = false;
     this.transferStopped = false; // 传输停止标志
+    this.isPeerLeaving = false; // 标志，用于判断是否是对方主动离开
     
     // ICE 服务器配置 (使用免费的 STUN 服务器)
     this.iceServers = [
@@ -124,6 +125,7 @@ class WebRTCManager {
         break;
         
       case 'peer-joined':
+        this.isPeerLeaving = false; // 重置标志，准备新连接
         
         if (message.clientType === 'cli') {
           // CLI客户端加入，不需要建立WebRTC连接，但需要通知应用
@@ -150,6 +152,12 @@ class WebRTCManager {
         break;
         
       case 'peer-left':
+        this.isPeerLeaving = true; // 设置标志，表示对方已离开
+        // 清除P2P连接超时定时器
+        if (this.p2pConnectionTimeout) {
+          clearTimeout(this.p2pConnectionTimeout);
+          this.p2pConnectionTimeout = null;
+        }
         // 不管是WebRTC还是CLI模式，都需要通知连接状态变化
         if (this.onConnectionStateChange) {
           this.onConnectionStateChange('disconnected');
@@ -225,6 +233,10 @@ class WebRTCManager {
     
     // 连接状态变化
     this.peerConnection.onconnectionstatechange = () => {
+      // 如果是对方主动离开导致的断开，则不执行任何操作
+      if (this.isPeerLeaving) {
+        return;
+      }
       
       // 处理P2P连接失败，尝试回退到中转模式
       if (this.peerConnection.connectionState === 'failed' || 
@@ -268,6 +280,11 @@ class WebRTCManager {
     this.dataChannel = channel;
     
     this.dataChannel.onopen = () => {
+      // P2P连接成功，清除超时
+      if (this.p2pConnectionTimeout) {
+        clearTimeout(this.p2pConnectionTimeout);
+        this.p2pConnectionTimeout = null;
+      }
       if (this.onDataChannelOpen) {
         this.onDataChannelOpen();
       }
@@ -443,6 +460,11 @@ class WebRTCManager {
   // 断开连接
   disconnect() {
     clearTimeout(this.connectionTimeout);
+    // 清除P2P连接超时定时器
+    if (this.p2pConnectionTimeout) {
+      clearTimeout(this.p2pConnectionTimeout);
+      this.p2pConnectionTimeout = null;
+    }
     this.closePeerConnection();
     
     if (this.ws) {
