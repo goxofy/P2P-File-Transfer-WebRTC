@@ -102,15 +102,9 @@ wss.on('connection', (ws, req) => {
         case 'join-room':
           handleJoinRoom(ws, data, ip);
           break;
-        switch (data.type) {
-        case 'join':
-          handleJoin(ws, data, ip);
-          break;
-        case 'join-room':
-          handleJoinRoom(ws, data, ip);
-          break;
         case 'offer':
         case 'answer':
+        case 'ice-candidate':
           handleSignaling(ws, data);
           break;
         case 'data':
@@ -156,7 +150,7 @@ wss.on('close', () => {
   clearInterval(transferCleanupInterval);
 });
 
-function handleJoinRoom(ws, data) {
+function handleJoinRoom(ws, data, ip) {
   const { roomId } = data;
   const clientId = generateClientId();
   
@@ -186,7 +180,7 @@ function handleJoinRoom(ws, data) {
     return;
   }
   
-  clients.set(ws, { clientId, roomId, mode: 'cli' });
+  clients.set(ws, { clientId, roomId, mode: 'cli', ip: ip });
   room.add(ws);
   
   
@@ -197,7 +191,8 @@ function handleJoinRoom(ws, data) {
       client.send(JSON.stringify({
         type: 'peer-joined',
         clientId: clientId,
-        clientType: 'cli'
+        clientType: 'cli',
+        ip: ip
       }));
       
       // 同时发送房间人数更新给现有成员
@@ -207,7 +202,8 @@ function handleJoinRoom(ws, data) {
           const clientInfo = clients.get(c);
           return clientInfo ? {
             clientId: clientInfo.clientId,
-            clientType: clientInfo.mode || 'unknown'
+            clientType: clientInfo.mode || 'unknown',
+            ip: clientInfo.ip
           } : null;
         })
         .filter(Boolean);
@@ -226,7 +222,8 @@ function handleJoinRoom(ws, data) {
     const clientInfo = clients.get(client);
     return clientInfo ? {
       clientId: clientInfo.clientId,
-      clientType: clientInfo.mode || 'unknown'
+      clientType: clientInfo.mode || 'unknown',
+      ip: clientInfo.ip
     } : null;
   }).filter(Boolean);
   
@@ -245,7 +242,8 @@ function handleJoinRoom(ws, data) {
       const clientInfo = clients.get(client);
       return clientInfo ? {
         clientId: clientInfo.clientId,
-        clientType: clientInfo.mode || 'unknown'
+        clientType: clientInfo.mode || 'unknown',
+        ip: clientInfo.ip
       } : null;
     })
     .filter(Boolean);
@@ -614,4 +612,12 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Signaling server running on port ${PORT}`);
   console.log(`Web interface available at http://localhost:${PORT}`);
+});
+
+// 优雅关闭
+process.on('SIGINT', () => {
+  console.log('Shutting down server...');
+  server.close(() => {
+    process.exit(0);
+  });
 });

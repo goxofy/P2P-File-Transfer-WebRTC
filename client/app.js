@@ -173,7 +173,9 @@ class WebRTCApp {
       
       if (error.type === '传输中断') {
         // 显示明确的传输中断提示
-        alert(`传输已中断：${error.message}\n\n房间已被清理，请重新连接。`);
+        alert(`传输已中断：${error.message}
+
+房间已被清理，请重新连接。`);
         this.fileTransfer.stopAllTransfers();
         this.updateConnectionStatus('disconnected');
         this.isConnected = false;
