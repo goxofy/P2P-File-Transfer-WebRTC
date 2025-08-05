@@ -98,6 +98,12 @@ class WebRTCApp {
         }
         return;
       }
+
+      // 处理新用户加入的通知
+      if (state === 'peer-joined' && data) {
+        const clientName = data.clientType === 'cli' ? 'CLI 用户' : 'Web 用户';
+        this.log(`[系统消息] ${clientName} (IP: ${data.ip}) 已加入房间`, 'info');
+      }
       
       this.updateConnectionStatus(state);
       

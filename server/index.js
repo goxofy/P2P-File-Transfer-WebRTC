@@ -81,7 +81,10 @@ const transferCleanupInterval = setInterval(() => {
   });
 }, TRANSFER_TIMEOUT / 2);
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
+  
+  // 获取客户端IP地址 (考虑代理情况)
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   
   // 设置心跳相关属性
   ws.isAlive = true;
@@ -94,14 +97,20 @@ wss.on('connection', (ws) => {
       
       switch (data.type) {
         case 'join':
-          handleJoin(ws, data);
+          handleJoin(ws, data, ip);
           break;
         case 'join-room':
-          handleJoinRoom(ws, data);
+          handleJoinRoom(ws, data, ip);
+          break;
+        switch (data.type) {
+        case 'join':
+          handleJoin(ws, data, ip);
+          break;
+        case 'join-room':
+          handleJoinRoom(ws, data, ip);
           break;
         case 'offer':
         case 'answer':
-        case 'ice-candidate':
           handleSignaling(ws, data);
           break;
         case 'data':

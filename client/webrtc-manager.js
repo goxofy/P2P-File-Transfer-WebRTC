@@ -105,27 +105,31 @@ class WebRTCManager {
     switch (message.type) {
       case 'room-joined':
         if (message.existingMembers.length > 0) {
+          // 通知已存在的成员
+          message.existingMembers.forEach(member => {
+            if (this.onConnectionStateChange) {
+              this.onConnectionStateChange('peer-joined', { ip: member.ip, clientType: member.clientType });
+            }
+          });
+
           // 检查是否有其他Web客户端
           const webClients = message.existingMembers.filter(member => member.clientType === 'web');
-          const cliClients = message.existingMembers.filter(member => member.clientType === 'cli');
-          
           
           if (webClients.length > 0) {
             // 如果房间里已有其他Web客户端，作为发起方建立WebRTC连接
             this.isInitiator = true;
             await this.initializePeerConnection();
             await this.createOffer();
-          } else if (cliClients.length > 0) {
-            // 只有CLI客户端，标记为连接状态但不建立WebRTC
-            if (this.onConnectionStateChange) {
-              this.onConnectionStateChange('connected-cli');
-            }
           }
         }
         break;
         
       case 'peer-joined':
         this.isPeerLeaving = false; // 重置标志，准备新连接
+        // 通知新成员加入
+        if (this.onConnectionStateChange) {
+          this.onConnectionStateChange('peer-joined', { ip: message.ip, clientType: message.clientType });
+        }
         
         if (message.clientType === 'cli') {
           // CLI客户端加入，不需要建立WebRTC连接，但需要通知应用
