@@ -103,6 +103,7 @@ class WebRTCApp {
       if (state === 'peer-joined' && data) {
         const clientName = data.clientType === 'cli' ? 'CLI 用户' : 'Web 用户';
         this.log(`[系统消息] ${clientName} (IP: ${data.ip}) 已加入房间`, 'info');
+        return; // 只记录日志，不改变连接状态
       }
       
       this.updateConnectionStatus(state);

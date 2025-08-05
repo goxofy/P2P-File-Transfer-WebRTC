@@ -360,7 +360,7 @@ function generateClientId() {
   return 'cli-' + Math.random().toString(36).substr(2, 8);
 }
 
-function handleJoin(ws, data) {
+function handleJoin(ws, data, ip) {
   const { roomId, clientId } = data;
   
   if (!rooms.has(roomId)) {
@@ -389,7 +389,7 @@ function handleJoin(ws, data) {
     return;
   }
   
-  clients.set(ws, { clientId, roomId, mode: 'web' });
+  clients.set(ws, { clientId, roomId, mode: 'web', ip: ip });
   room.add(ws);
   
   
@@ -400,7 +400,8 @@ function handleJoin(ws, data) {
       client.send(JSON.stringify({
         type: 'peer-joined',
         clientId: clientId,
-        clientType: 'web'
+        clientType: 'web',
+        ip: ip
       }));
       
       // 同时发送房间人数更新给现有成员
@@ -410,7 +411,8 @@ function handleJoin(ws, data) {
           const clientInfo = clients.get(c);
           return clientInfo ? {
             clientId: clientInfo.clientId,
-            clientType: clientInfo.mode || 'unknown'
+            clientType: clientInfo.mode || 'unknown',
+            ip: clientInfo.ip
           } : null;
         })
         .filter(Boolean);
@@ -429,7 +431,8 @@ function handleJoin(ws, data) {
     const clientInfo = clients.get(client);
     return clientInfo ? {
       clientId: clientInfo.clientId,
-      clientType: clientInfo.mode || 'unknown'
+      clientType: clientInfo.mode || 'unknown',
+      ip: clientInfo.ip
     } : null;
   }).filter(Boolean);
   
@@ -446,7 +449,8 @@ function handleJoin(ws, data) {
       const clientInfo = clients.get(client);
       return clientInfo ? {
         clientId: clientInfo.clientId,
-        clientType: clientInfo.mode || 'unknown'
+        clientType: clientInfo.mode || 'unknown',
+        ip: clientInfo.ip
       } : null;
     })
     .filter(Boolean);
