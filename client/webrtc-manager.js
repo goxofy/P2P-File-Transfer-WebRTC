@@ -237,8 +237,8 @@ class WebRTCManager {
     
     // 连接状态变化
     this.peerConnection.onconnectionstatechange = () => {
-      // 如果是对方主动离开导致的断开，则不执行任何操作
-      if (this.isPeerLeaving) {
+      // 如果 peerConnection 不存在或对方主动离开，则不执行任何操作
+      if (!this.peerConnection || this.isPeerLeaving) {
         return;
       }
       
