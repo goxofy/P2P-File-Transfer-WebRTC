@@ -437,7 +437,7 @@ class WebRTCManager {
       }
       
       const checkBuffer = () => {
-        if (this.dataChannel.bufferedAmount < bufferThreshold) {
+        if (!this.dataChannel || this.dataChannel.bufferedAmount < bufferThreshold) {
           resolve();
         } else {
           setTimeout(checkBuffer, 10); // 减少检查间隔到10ms
