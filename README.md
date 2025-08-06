@@ -39,7 +39,7 @@ npm start
 
 #### 方式二：使用命令行 (CLI)
 
-你需要在两个终端窗口中进行操作。
+命令行工具可以与 **Web 界面**或**另一个终端**的用户进行文件传输。
 
 1.  **(可选) 全局安装或链接 CLI:**
     ```bash
@@ -49,22 +49,27 @@ npm start
     npm link
     ```
 
-2.  **接收方 (终端 1):**
-    首先获取一个房间ID。
+2.  **获取房间 ID:**
+    在终端中运行 `p2p-transfer room` 或从 Web 界面获取一个房间 ID。
     ```bash
     p2p-transfer room
     # 🏠 随机房间ID: ABCDEFG
     ```
-    然后使用此ID等待接收文件。
-    ```bash
-    p2p-transfer receive --room ABCDEFG
-    ```
 
-3.  **发送方 (终端 2):**
-    使用相同的房间ID发送文件。
-    ```bash
-    p2p-transfer send ./path/to/your/file.txt --room ABCDEFG
-    ```
+3.  **开始传输:**
+    使用相同的房间 ID，一端作为接收方，另一端作为发送方。
+
+    - **CLI 作为接收方:**
+      ```bash
+      p2p-transfer receive --room ABCDEFG
+      ```
+      *此时，Web 用户或另一个 CLI 用户可以在同一房间向你发送文件。*
+
+    - **CLI 作为发送方:**
+      ```bash
+      p2p-transfer send ./path/to/your/file.txt --room ABCDEFG
+      ```
+      *此时，Web 用户或另一个 CLI 用户可以在同一房间接收你的文件。*
 
 ## 🛠️ 为开发者：构建二进制文件
 
