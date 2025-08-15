@@ -90,3 +90,8 @@ npm start
 ## 📄 许可证
 
 本项目基于 [MIT](LICENSE) 许可证。
+
+## 🎆 Screenshot
+
+<img width="1670" height="1002" alt="CleanShot 2025-08-16 at 02 34 18@2x" src="https://github.com/user-attachments/assets/2023428d-041e-433b-933c-071308133f61" />
+
